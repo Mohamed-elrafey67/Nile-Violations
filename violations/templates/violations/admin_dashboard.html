@@ -1,0 +1,938 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة تحكم الإدارة — منظومة توثيق أراضي طرح النهر</title>
+  <link rel="stylesheet" href="{% static 'violations/libs/fontawesome/css/all.min.css' %}"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --primary:#0d3b6e;--accent:#e74c3c;--gold:#f39c12;
+      --green:#27ae60;--purple:#8e44ad;--teal:#16a085;
+      --light:#f0f4f9;--sidebar:240px;
+    }
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--light);display:flex;min-height:100vh;}
+
+    /* SIDEBAR */
+    .sidebar{
+      width:var(--sidebar);background:linear-gradient(180deg,#0d3b6e 0%,#1a5276 100%);
+      color:#fff;display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;
+      z-index:100;box-shadow:-3px 0 15px rgba(0,0,0,.2);
+    }
+    .sb-logo{
+      padding:20px 16px;border-bottom:1px solid rgba(255,255,255,.1);
+      display:flex;align-items:center;gap:10px;
+    }
+    .sb-logo i{font-size:1.8rem;color:#74b9ff}
+    .sb-logo div h2{font-size:.85rem;line-height:1.3}
+    .sb-logo div small{font-size:.68rem;opacity:.7}
+    .sb-nav{flex:1;padding:12px 0;overflow-y:auto}
+    .nav-section{font-size:.65rem;text-transform:uppercase;color:rgba(255,255,255,.4);
+      padding:10px 16px 4px;letter-spacing:1px}
+    .nav-item{
+      display:flex;align-items:center;gap:10px;padding:10px 16px;
+      color:rgba(255,255,255,.8);cursor:pointer;transition:all .2s;
+      font-size:.83rem;text-decoration:none;border-right:3px solid transparent;
+    }
+    .nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+    .nav-item.active{background:rgba(255,255,255,.12);color:#fff;
+      border-right-color:#74b9ff}
+    .nav-item i{width:18px;text-align:center;font-size:.9rem}
+    .nav-badge{background:var(--accent);color:#fff;font-size:.65rem;
+      padding:2px 6px;border-radius:10px;margin-right:auto}
+    .sb-footer{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);font-size:.75rem;opacity:.7}
+
+    /* MAIN */
+    .main{margin-right:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+
+    /* TOPBAR */
+    .topbar{
+      background:#fff;padding:0 24px;height:56px;display:flex;align-items:center;
+      gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);position:sticky;top:0;z-index:50;
+    }
+    .topbar h1{font-size:1rem;color:var(--primary);font-weight:700}
+    .topbar-right{margin-right:auto;display:flex;align-items:center;gap:12px}
+    .user-chip{
+      display:flex;align-items:center;gap:8px;
+      background:#f0f4f9;padding:6px 12px;border-radius:20px;font-size:.8rem;
+    }
+    .user-chip .avatar{
+      width:28px;height:28px;border-radius:50%;background:var(--primary);
+      color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;
+    }
+    .btn-sm{
+      padding:6px 14px;border:none;border-radius:6px;cursor:pointer;
+      font-family:inherit;font-size:.78rem;font-weight:600;transition:all .2s;
+    }
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-danger{background:var(--accent);color:#fff}
+    .btn-success{background:var(--green);color:#fff}
+    .btn-warning{background:var(--gold);color:#fff}
+
+    /* CONTENT */
+    .content{padding:20px 24px;flex:1}
+
+    /* STAT CARDS */
+    .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    .stat-card{
+      background:#fff;border-radius:12px;padding:18px 20px;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);position:relative;overflow:hidden;
+    }
+    .stat-card::before{
+      content:'';position:absolute;top:0;right:0;bottom:0;width:4px;
+    }
+    .stat-card.blue::before{background:var(--primary)}
+    .stat-card.red::before{background:var(--accent)}
+    .stat-card.green::before{background:var(--green)}
+    .stat-card.gold::before{background:var(--gold)}
+    .stat-card.purple::before{background:var(--purple)}
+    .stat-icon{font-size:1.8rem;margin-bottom:8px;opacity:.15;position:absolute;
+      left:16px;top:50%;transform:translateY(-50%)}
+    .stat-val{font-size:1.7rem;font-weight:700;color:var(--primary);line-height:1}
+    .stat-lbl{font-size:.75rem;color:#888;margin-top:4px}
+    .stat-sub{font-size:.72rem;color:#aaa;margin-top:6px}
+
+    /* TABLES */
+    .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:20px;overflow:hidden}
+    .card-head{
+      padding:14px 18px;display:flex;align-items:center;gap:10px;
+      border-bottom:1px solid #eef0f5;
+    }
+    .card-head h3{font-size:.9rem;color:var(--primary);font-weight:700;flex:1}
+    .card-body{padding:0}
+
+    table{width:100%;border-collapse:collapse;font-size:.8rem}
+    th{background:#f8fafc;padding:10px 14px;text-align:right;font-weight:600;
+      color:#555;border-bottom:2px solid #eef0f5;white-space:nowrap}
+    td{padding:9px 14px;border-bottom:1px solid #f5f5f5;color:#333}
+    tr:hover td{background:#fafbff}
+    tr:last-child td{border-bottom:none}
+
+    .badge{display:inline-block;padding:3px 8px;border-radius:10px;font-size:.7rem;font-weight:700}
+    .badge-green{background:#d4edda;color:#155724}
+    .badge-yellow{background:#fff3cd;color:#856404}
+    .badge-red{background:#f8d7da;color:#721c24}
+    .badge-blue{background:#d1ecf1;color:#0c5460}
+    .badge-purple{background:#e9d8fd;color:#553c9a}
+
+    .role-badge{font-size:.68rem;padding:2px 7px;border-radius:8px;font-weight:700}
+    .role-manager{background:#0d3b6e;color:#fff}
+    .role-supervisor{background:#1a6ea8;color:#fff}
+    .role-data_entry{background:#27ae60;color:#fff}
+    .role-viewer{background:#95a5a6;color:#fff}
+
+    /* LOG */
+    .log-item{
+      padding:10px 18px;border-bottom:1px solid #f5f5f5;
+      display:flex;align-items:center;gap:12px;font-size:.8rem;
+    }
+    .log-item:last-child{border-bottom:none}
+    .log-icon{width:32px;height:32px;border-radius:50%;display:flex;
+      align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+    .log-meta{color:#888;font-size:.72rem;margin-top:2px}
+    .log-action{font-weight:600;color:var(--primary)}
+
+    /* FILTERS */
+    .filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .filter-bar input,.filter-bar select{
+      padding:6px 10px;border:1.5px solid #d0d7e3;border-radius:6px;
+      font-size:.78rem;font-family:inherit;outline:none;
+    }
+    .filter-bar input:focus,.filter-bar select:focus{border-color:var(--primary)}
+
+    /* TWO COLS */
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+
+    /* PAGINATION */
+    .pagination{display:flex;gap:6px;padding:12px 18px;justify-content:center}
+    .page-btn{
+      padding:5px 10px;border:1.5px solid #d0d7e3;border-radius:5px;
+      cursor:pointer;font-size:.78rem;background:#fff;color:var(--primary);
+    }
+    .page-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .page-btn:hover:not(.active){background:#f0f4f9}
+
+    /* MODAL */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200}
+    .modal-overlay.open{display:flex;align-items:center;justify-content:center}
+    .modal-box{
+      background:#fff;border-radius:12px;width:520px;max-width:95vw;
+      max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+    }
+    .modal-head{
+      background:linear-gradient(135deg,var(--primary),#1a6ea8);
+      color:#fff;padding:14px 18px;display:flex;justify-content:space-between;
+    }
+    .modal-body{padding:20px;overflow-y:auto;flex:1}
+    .modal-foot{padding:12px 18px;border-top:1px solid #eee;display:flex;gap:8px;background:#fafbfd}
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;font-size:.78rem;font-weight:600;color:#555;margin-bottom:4px}
+    .form-group input,.form-group select{
+      width:100%;padding:8px 10px;border:1.5px solid #d0d7e3;border-radius:6px;
+      font-size:.83rem;font-family:inherit;outline:none;
+    }
+    .form-group input:focus,.form-group select:focus{border-color:var(--primary)}
+
+    /* CHART PLACEHOLDER */
+    .chart-area{padding:16px 18px;height:200px;display:flex;align-items:center;
+      justify-content:center;color:#aaa;font-size:.85rem}
+    .mini-bar{display:flex;align-items:flex-end;gap:6px;height:140px;padding-top:10px}
+    .bar-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+    .bar{border-radius:4px 4px 0 0;min-height:4px;transition:height .5s;width:100%}
+    .bar-lbl{font-size:.65rem;color:#888;text-align:center}
+    .bar-val{font-size:.7rem;font-weight:700;color:var(--primary)}
+
+    @media(max-width:1100px){
+      .stat-grid{grid-template-columns:repeat(2,1fr)}
+      .two-col,.three-col{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-logo">
+    <i class="fa fa-water"></i>
+    <div>
+      <h2>لوحة تحكم</h2>
+      <small>وزارة الموارد المائية</small>
+    </div>
+  </div>
+  <div class="sb-nav">
+    <div class="nav-section">الرئيسية</div>
+    <a class="nav-item active" onclick="showSection('overview')">
+      <i class="fa fa-gauge"></i> نظرة عامة
+    </a>
+    <a class="nav-item" onclick="showSection('users')">
+      <i class="fa fa-users"></i> المستخدمون
+      <span class="nav-badge" id="nb-users">—</span>
+    </a>
+    <a class="nav-item" onclick="showSection('violations')">
+      <i class="fa fa-map-marker-alt"></i> التعديات
+    </a>
+    <div class="nav-section">النظام</div>
+    <a class="nav-item" onclick="showSection('logs')">
+      <i class="fa fa-history"></i> سجل الأنشطة
+      <span class="nav-badge" id="nb-logs">—</span>
+    </a>
+    <a class="nav-item" onclick="showSection('reports')">
+      <i class="fa fa-file-export"></i> التقارير
+    </a>
+    <div class="nav-section">روابط</div>
+    <a class="nav-item" href="/" target="_blank">
+      <i class="fa fa-map"></i> الخريطة الرئيسية
+    </a>
+    <a class="nav-item" href="/admin/" target="_blank">
+      <i class="fa fa-cog"></i> Django Admin
+    </a>
+  </div>
+  <div class="sb-footer">
+    <div>{{ user.get_full_name|default:user.username }}</div>
+    <div style="margin-top:4px"><a href="/logout/" style="color:rgba(255,255,255,.6);text-decoration:none;font-size:.72rem;"><i class="fa fa-right-from-bracket"></i> تسجيل الخروج</a></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="section-title">نظرة عامة</h1>
+    <div class="topbar-right">
+      <div class="user-chip">
+        <div class="avatar">{{ user.username|first|upper }}</div>
+        <span>{{ user.get_full_name|default:user.username }}</span>
+        <span class="badge badge-blue" style="font-size:.65rem;">مدير</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ OVERVIEW ══ -->
+    <div id="sec-overview">
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card blue">
+          <i class="fa fa-water stat-icon"></i>
+          <div class="stat-val" id="s-total">—</div>
+          <div class="stat-lbl">إجمالي التعديات</div>
+          <div class="stat-sub" id="s-approved">—</div>
+        </div>
+        <div class="stat-card gold">
+          <i class="fa fa-clock stat-icon"></i>
+          <div class="stat-val" id="s-pending">—</div>
+          <div class="stat-lbl">في انتظار الموافقة</div>
+          <div class="stat-sub">تحتاج مراجعة</div>
+        </div>
+        <div class="stat-card green">
+          <i class="fa fa-ruler-combined stat-icon"></i>
+          <div class="stat-val" id="s-area">—</div>
+          <div class="stat-lbl">إجمالي المساحة م²</div>
+          <div class="stat-sub" id="s-geo">—</div>
+        </div>
+        <div class="stat-card purple">
+          <i class="fa fa-users stat-icon"></i>
+          <div class="stat-val" id="s-users">—</div>
+          <div class="stat-lbl">المستخدمون النشطون</div>
+          <div class="stat-sub" id="s-govs">—</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- Top govs -->
+        <div class="card">
+          <div class="card-head">
+            <i class="fa fa-flag" style="color:var(--primary)"></i>
+            <h3>أعلى المحافظات تعدياً</h3>
+          </div>
+          <div id="top-govs-chart" class="chart-area">
+            <div class="mini-bar" id="mini-bar"></div>
+          </div>
+        </div>
+        <!-- Recent activity -->
+        <div class="card">
+          <div class="card-head">
+            <i class="fa fa-bolt" style="color:var(--gold)"></i>
+            <h3>آخر الأنشطة</h3>
+          </div>
+          <div id="recent-logs"></div>
+        </div>
+      </div>
+
+      <!-- Pending violations -->
+      <div class="card">
+        <div class="card-head">
+          <i class="fa fa-clock" style="color:var(--gold)"></i>
+          <h3>السجلات المعلّقة</h3>
+          <button class="btn-sm btn-success" onclick="showSection('violations')">عرض الكل</button>
+        </div>
+        <div id="pending-table"></div>
+      </div>
+    </div>
+
+    <!-- ══ USERS ══ -->
+    <div id="sec-users" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <i class="fa fa-users" style="color:var(--primary)"></i>
+          <h3>إدارة المستخدمين</h3>
+          <button class="btn-sm btn-primary" onclick="openAddUser()">
+            <i class="fa fa-plus"></i> مستخدم جديد
+          </button>
+        </div>
+        <div id="users-table"></div>
+      </div>
+    </div>
+
+    <!-- ══ VIOLATIONS ══ -->
+    <div id="sec-violations" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <i class="fa fa-filter" style="color:var(--primary)"></i>
+          <h3>إدارة التعديات</h3>
+          <div class="filter-bar">
+            <select id="vf-status" onchange="loadViolationsAdmin()">
+              <option value="">الكل</option>
+              <option value="pending">في الانتظار</option>
+              <option value="approved">معتمد</option>
+              <option value="rejected">مرفوض</option>
+            </select>
+            <select id="vf-gov" onchange="loadViolationsAdmin()">
+              <option value="">كل المحافظات</option>
+            </select>
+            <input type="text" id="vf-search" placeholder="بحث…" oninput="loadViolationsAdmin()">
+          </div>
+        </div>
+        <div id="violations-admin-table"></div>
+      </div>
+    </div>
+
+    <!-- ══ LOGS ══ -->
+    <div id="sec-logs" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <i class="fa fa-history" style="color:var(--primary)"></i>
+          <h3>سجل الأنشطة الكامل</h3>
+          <div class="filter-bar">
+            <select id="lf-action" onchange="loadLogs()">
+              <option value="">كل الأنشطة</option>
+              <option value="login">تسجيل دخول</option>
+              <option value="logout">تسجيل خروج</option>
+              <option value="add">إضافة سجل</option>
+              <option value="approve">موافقة</option>
+              <option value="reject">رفض</option>
+              <option value="export">تصدير</option>
+              <option value="login_fail">محاولة فاشلة</option>
+            </select>
+            <select id="lf-user" onchange="loadLogs()">
+              <option value="">كل المستخدمين</option>
+            </select>
+            <input type="date" id="lf-date" onchange="loadLogs()">
+            <button class="btn-sm btn-primary" onclick="exportLogs()">
+              <i class="fa fa-download"></i> تصدير
+            </button>
+          </div>
+        </div>
+        <div id="logs-container"></div>
+      </div>
+    </div>
+
+    <!-- ══ REPORTS ══ -->
+    <div id="sec-reports" style="display:none">
+      <div class="three-col">
+        <div class="card">
+          <div class="card-head">
+            <i class="fa fa-file-excel" style="color:#27ae60"></i>
+            <h3>تقرير Excel</h3>
+          </div>
+          <div style="padding:18px">
+            <div class="form-group">
+              <label>المحافظة</label>
+              <select id="rpt-gov"><option value="">الكل</option></select>
+            </div>
+            <div class="form-group">
+              <label>الحالة</label>
+              <select id="rpt-status">
+                <option value="">الكل</option>
+                <option value="approved">معتمد</option>
+                <option value="pending">في الانتظار</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الحد الأدنى للمساحة م²</label>
+              <input type="number" id="rpt-area" placeholder="0" min="0">
+            </div>
+            <button class="btn-sm btn-success" style="width:100%;padding:10px"
+              onclick="exportReport('excel')">
+              <i class="fa fa-file-excel"></i> تصدير Excel
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <i class="fa fa-file-pdf" style="color:#e74c3c"></i>
+            <h3>تقرير PDF</h3>
+          </div>
+          <div style="padding:18px">
+            <div class="form-group">
+              <label>المحافظة</label>
+              <select id="rpt-gov-pdf"><option value="">الكل</option></select>
+            </div>
+            <div class="form-group">
+              <label>الحالة</label>
+              <select id="rpt-status-pdf">
+                <option value="">الكل</option>
+                <option value="approved">معتمد</option>
+                <option value="pending">في الانتظار</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الحد الأدنى للمساحة م²</label>
+              <input type="number" id="rpt-area-pdf" placeholder="0" min="0">
+            </div>
+            <button class="btn-sm btn-danger" style="width:100%;padding:10px"
+              onclick="exportReport('pdf')">
+              <i class="fa fa-file-pdf"></i> تصدير PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <i class="fa fa-chart-bar" style="color:var(--primary)"></i>
+            <h3>إحصائيات سريعة</h3>
+          </div>
+          <div style="padding:18px" id="quick-stats">
+            <div style="text-align:center;color:#aaa;padding:20px">جاري التحميل…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- USER MODAL -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span style="font-weight:700" id="user-modal-title">مستخدم جديد</span>
+      <span onclick="closeUserModal()" style="cursor:pointer;opacity:.8;">✕</span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="um-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>اسم المستخدم *</label>
+          <input type="text" id="um-username" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input type="password" id="um-password" placeholder="اتركه فارغاً للإبقاء">
+        </div>
+        <div class="form-group">
+          <label>الاسم الأول</label>
+          <input type="text" id="um-first" placeholder="الاسم">
+        </div>
+        <div class="form-group">
+          <label>الاسم الأخير</label>
+          <input type="text" id="um-last" placeholder="اللقب">
+        </div>
+        <div class="form-group">
+          <label>البريد الإلكتروني</label>
+          <input type="email" id="um-email" placeholder="email@example.com">
+        </div>
+        <div class="form-group">
+          <label>الدور *</label>
+          <select id="um-role">
+            <option value="viewer">مشاهد</option>
+            <option value="data_entry">مدخل بيانات</option>
+            <option value="supervisor">مشرف</option>
+            <option value="manager">مدير</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>المحافظة المسؤول عنها</label>
+          <select id="um-gov">
+            <option value="">كل المحافظات</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-sm btn-primary" onclick="saveUser()" style="flex:1;padding:9px">
+        <i class="fa fa-save"></i> حفظ
+      </button>
+      <button class="btn-sm" onclick="closeUserModal()"
+        style="padding:9px 16px;background:#fff;border:1.5px solid #ddd;border-radius:6px;cursor:pointer;font-family:inherit">
+        إلغاء
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentSection = 'overview';
+
+// ── SECTION SWITCH ────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('[id^="sec-"]').forEach(function(el) {
+    el.style.display = 'none';
+  });
+  document.getElementById('sec-' + name).style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  event.currentTarget && event.currentTarget.classList.add('active');
+
+  var titles = {
+    overview:'نظرة عامة', users:'إدارة المستخدمين',
+    violations:'إدارة التعديات', logs:'سجل الأنشطة', reports:'التقارير'
+  };
+  document.getElementById('section-title').textContent = titles[name] || name;
+  currentSection = name;
+
+  if (name === 'users')      loadUsers();
+  if (name === 'violations') loadViolationsAdmin();
+  if (name === 'logs')       loadLogs();
+  if (name === 'reports')    loadReportGovs();
+}
+
+// ── OVERVIEW ──────────────────────────────────────────
+function loadOverview() {
+  fetch('/admin-dashboard/api/stats/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('s-total').textContent   = (d.total||0).toLocaleString('ar');
+      document.getElementById('s-approved').textContent = 'معتمد: ' + (d.approved||0).toLocaleString('ar');
+      document.getElementById('s-pending').textContent  = (d.pending||0).toLocaleString('ar');
+      document.getElementById('s-area').textContent     = Math.round(d.total_area||0).toLocaleString('ar');
+      document.getElementById('s-geo').textContent      = 'مرتبط جيو: ' + (d.geo_count||0).toLocaleString('ar');
+      document.getElementById('s-users').textContent    = (d.user_count||0);
+      document.getElementById('s-govs').textContent     = (d.gov_count||0) + ' محافظة مُدرجة';
+      document.getElementById('nb-users').textContent   = d.user_count||0;
+
+      // Mini bar chart for top govs
+      buildBarChart(d.top_govs || []);
+
+      // Pending badge
+      document.getElementById('nb-logs').textContent = d.today_logs||0;
+    });
+
+  loadRecentLogs();
+  loadPendingTable();
+}
+
+function buildBarChart(govs) {
+  var el = document.getElementById('mini-bar');
+  if (!govs.length) { el.parentElement.innerHTML = '<div class="chart-area">لا توجد بيانات</div>'; return; }
+  var max = Math.max.apply(null, govs.map(function(g) { return g.count; }));
+  var colors = ['#0d3b6e','#1a6ea8','#2980b9','#3498db','#74b9ff'];
+  el.innerHTML = govs.slice(0,5).map(function(g, i) {
+    var pct = max > 0 ? Math.round(g.count / max * 100) : 0;
+    return '<div class="bar-wrap">' +
+      '<div class="bar-val">' + g.count + '</div>' +
+      '<div class="bar" style="height:' + pct + '%;background:' + (colors[i]||'#0d3b6e') + ';"></div>' +
+      '<div class="bar-lbl">' + (g.name||'—').substring(0,5) + '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function loadRecentLogs() {
+  fetch('/admin-dashboard/api/logs/?limit=5')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('recent-logs');
+      var icons = {
+        login:'fa-right-to-bracket:#27ae60', logout:'fa-right-from-bracket:#95a5a6',
+        add:'fa-plus:#27ae60', edit:'fa-pen:#3498db',
+        approve:'fa-check:#27ae60', reject:'fa-times:#e74c3c',
+        export:'fa-download:#8e44ad', login_fail:'fa-ban:#e74c3c',
+        import:'fa-upload:#f39c12',
+      };
+      el.innerHTML = (d.logs||[]).map(function(log) {
+        var ic = (icons[log.action] || 'fa-circle:#888').split(':');
+        return '<div class="log-item">' +
+          '<div class="log-icon" style="background:' + ic[1] + '22;color:' + ic[1] + '">' +
+          '<i class="fa ' + ic[0] + '"></i></div>' +
+          '<div><div class="log-action">' + log.action_display + '</div>' +
+          '<div class="log-meta">' + (log.user||'—') + ' • ' + log.target + ' • ' + log.time + '</div>' +
+          '</div></div>';
+      }).join('') || '<div style="padding:20px;text-align:center;color:#aaa">لا توجد أنشطة</div>';
+    });
+}
+
+function loadPendingTable() {
+  fetch('/api/violations/pending/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('pending-table');
+      if (!d.records || !d.records.length) {
+        el.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;"><i class="fa fa-check-circle" style="color:#27ae60;font-size:1.5rem;"></i><br>لا توجد سجلات معلّقة</div>';
+        return;
+      }
+      el.innerHTML = '<table><thead><tr>' +
+        '<th>الرمز</th><th>المحافظة</th><th>القرية</th><th>المستغل</th><th>المساحة م²</th><th>أُدخل بواسطة</th><th>التاريخ</th><th>إجراء</th>' +
+        '</tr></thead><tbody>' +
+        d.records.slice(0,10).map(function(r) {
+          var date = r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar') : '—';
+          return '<tr>' +
+            '<td><strong>' + r.code + '</strong></td>' +
+            '<td>' + (r.governorate__name_ar||'—') + '</td>' +
+            '<td>' + r.village + '</td>' +
+            '<td>' + r.occupant + '</td>' +
+            '<td style="color:#e74c3c;font-weight:700">' + Math.round(r.area_total||0).toLocaleString('ar') + '</td>' +
+            '<td>' + (r.submitted_by__first_name||r.submitted_by__username||'—') + '</td>' +
+            '<td>' + date + '</td>' +
+            '<td>' +
+            '<button onclick="quickApprove(' + r.id + ',\'approve\')" style="padding:4px 8px;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.72rem;margin-left:4px;">✓ موافقة</button>' +
+            '<button onclick="quickApprove(' + r.id + ',\'reject\')" style="padding:4px 8px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.72rem;">✗ رفض</button>' +
+            '</td></tr>';
+        }).join('') + '</tbody></table>';
+    });
+}
+
+function quickApprove(id, action) {
+  fetch('/api/violations/' + id + '/approve/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({action: action, notes: ''})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) { loadOverview(); showToast(res.message, action==='approve'?'success':'error'); }
+  });
+}
+
+// ── USERS ─────────────────────────────────────────────
+var allGovs = [];
+
+function loadUsers() {
+  fetch('/admin-dashboard/api/users/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var roleBadge = {
+        manager:'role-manager', supervisor:'role-supervisor',
+        data_entry:'role-data_entry', viewer:'role-viewer'
+      };
+      var roleLabel = {
+        manager:'مدير', supervisor:'مشرف',
+        data_entry:'مدخل بيانات', viewer:'مشاهد'
+      };
+      var el = document.getElementById('users-table');
+      el.innerHTML = '<table><thead><tr>' +
+        '<th>المستخدم</th><th>الاسم</th><th>البريد</th><th>الدور</th>' +
+        '<th>المحافظة</th><th>آخر دخول</th><th>الحالة</th><th>إجراء</th>' +
+        '</tr></thead><tbody>' +
+        (d.users||[]).map(function(u) {
+          var lastLogin = u.last_login ? new Date(u.last_login).toLocaleDateString('ar') : 'لم يدخل';
+          var active = u.is_active
+            ? '<span class="badge badge-green">نشط</span>'
+            : '<span class="badge badge-red">موقوف</span>';
+          return '<tr>' +
+            '<td><strong>' + u.username + '</strong></td>' +
+            '<td>' + (u.full_name||'—') + '</td>' +
+            '<td>' + (u.email||'—') + '</td>' +
+            '<td><span class="role-badge ' + (roleBadge[u.role]||'') + '">' + (roleLabel[u.role]||u.role||'—') + '</span></td>' +
+            '<td>' + (u.governorate||'الكل') + '</td>' +
+            '<td>' + lastLogin + '</td>' +
+            '<td>' + active + '</td>' +
+            '<td>' +
+            '<button onclick="editUser(' + u.id + ')" style="padding:4px 8px;background:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.72rem;margin-left:4px;"><i class="fa fa-pen"></i></button>' +
+            '<button onclick="toggleUser(' + u.id + ',' + u.is_active + ')" style="padding:4px 8px;background:' + (u.is_active?'#e74c3c':'#27ae60') + ';color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.72rem;">' + (u.is_active?'إيقاف':'تفعيل') + '</button>' +
+            '</td></tr>';
+        }).join('') + '</tbody></table>';
+    });
+}
+
+function openAddUser() {
+  document.getElementById('user-modal-title').textContent = 'مستخدم جديد';
+  document.getElementById('um-id').value = '';
+  ['um-username','um-first','um-last','um-email','um-password'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('um-role').value = 'viewer';
+  document.getElementById('um-gov').value = '';
+  document.getElementById('user-modal').classList.add('open');
+  loadGovDropdown('um-gov');
+}
+
+function editUser(id) {
+  fetch('/admin-dashboard/api/users/' + id + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(u) {
+      document.getElementById('user-modal-title').textContent = 'تعديل: ' + u.username;
+      document.getElementById('um-id').value       = u.id;
+      document.getElementById('um-username').value = u.username;
+      document.getElementById('um-first').value    = u.first_name || '';
+      document.getElementById('um-last').value     = u.last_name  || '';
+      document.getElementById('um-email').value    = u.email      || '';
+      document.getElementById('um-password').value = '';
+      document.getElementById('um-role').value     = u.role       || 'viewer';
+      loadGovDropdown('um-gov', u.gov_pcode);
+      document.getElementById('user-modal').classList.add('open');
+    });
+}
+
+function loadGovDropdown(selectId, selectedPcode) {
+  fetch('/admin-dashboard/api/govs/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var sel = document.getElementById(selectId);
+      var cur = sel.innerHTML.split('\n')[0]; // keep first option
+      sel.innerHTML = '<option value="">كل المحافظات</option>';
+      (d.govs||[]).forEach(function(g) {
+        var opt = document.createElement('option');
+        opt.value = g.pcode; opt.textContent = g.name_ar;
+        if (g.pcode === selectedPcode) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+}
+
+function saveUser() {
+  var id = document.getElementById('um-id').value;
+  var data = {
+    username:   document.getElementById('um-username').value.trim(),
+    first_name: document.getElementById('um-first').value.trim(),
+    last_name:  document.getElementById('um-last').value.trim(),
+    email:      document.getElementById('um-email').value.trim(),
+    password:   document.getElementById('um-password').value,
+    role:       document.getElementById('um-role').value,
+    gov_pcode:  document.getElementById('um-gov').value,
+  };
+  var url = id ? '/admin-dashboard/api/users/' + id + '/' : '/admin-dashboard/api/users/';
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) { closeUserModal(); loadUsers(); showToast(res.message,'success'); }
+    else showToast(res.error||'خطأ','error');
+  });
+}
+
+function toggleUser(id, isActive) {
+  fetch('/admin-dashboard/api/users/' + id + '/toggle/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) { loadUsers(); showToast(res.message,'success'); }
+  });
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.remove('open');
+}
+
+// ── VIOLATIONS ADMIN ──────────────────────────────────
+function loadViolationsAdmin() {
+  var status = document.getElementById('vf-status').value;
+  var gov    = document.getElementById('vf-gov').value;
+  var search = document.getElementById('vf-search').value;
+  var qs = '?';
+  if (status) qs += 'status=' + status + '&';
+  if (gov)    qs += 'gov=' + gov + '&';
+  if (search) qs += 'search=' + search;
+  fetch('/api/violations/' + qs)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var statusBadge = {
+        approved:'<span class="badge badge-green">معتمد</span>',
+        pending:'<span class="badge badge-yellow">انتظار</span>',
+        rejected:'<span class="badge badge-red">مرفوض</span>',
+      };
+      var el = document.getElementById('violations-admin-table');
+      el.innerHTML = '<div style="padding:8px 18px;font-size:.78rem;color:#888;">إجمالي: ' + d.summary.count + ' سجل | مساحة: ' + Math.round(d.summary.total_area||0).toLocaleString('ar') + ' م²</div>' +
+        '<table><thead><tr><th>الرمز</th><th>المحافظة</th><th>المركز</th><th>القرية</th><th>المستغل</th><th>المساحة م²</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>' +
+        (d.records||[]).map(function(r) {
+          return '<tr>' +
+            '<td><strong>' + r.code + '</strong></td>' +
+            '<td>' + (r.governorate__name_ar||'—') + '</td>' +
+            '<td>' + r.district_name + '</td>' +
+            '<td>' + r.village + '</td>' +
+            '<td>' + r.occupant + '</td>' +
+            '<td style="font-weight:700;color:#e74c3c">' + Math.round(r.area_total||0).toLocaleString('ar') + '</td>' +
+            '<td>' + (statusBadge[r.status]||r.status) + '</td>' +
+            '<td>' + (r.status==='pending'
+              ? '<button onclick="quickApprove('+r.id+',\'approve\')" style="padding:3px 7px;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.7rem;margin-left:3px;">✓</button>'
+              + '<button onclick="quickApprove('+r.id+',\'reject\')" style="padding:3px 7px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.7rem;">✗</button>'
+              : '—') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    });
+}
+
+// ── LOGS ──────────────────────────────────────────────
+function loadLogs() {
+  var action = document.getElementById('lf-action').value;
+  var user   = document.getElementById('lf-user').value;
+  var date   = document.getElementById('lf-date').value;
+  var qs = '?limit=50';
+  if (action) qs += '&action=' + action;
+  if (user)   qs += '&user=' + user;
+  if (date)   qs += '&date=' + date;
+
+  fetch('/admin-dashboard/api/logs/' + qs)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      // Load users dropdown
+      if (d.users) {
+        var sel = document.getElementById('lf-user');
+        var cur = sel.value;
+        sel.innerHTML = '<option value="">كل المستخدمين</option>';
+        d.users.forEach(function(u) {
+          var opt = document.createElement('option');
+          opt.value = u; opt.textContent = u;
+          if (u === cur) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      }
+
+      var icons = {
+        login:'fa-right-to-bracket:#27ae60', logout:'fa-right-from-bracket:#95a5a6',
+        add:'fa-plus:#27ae60', edit:'fa-pen:#3498db',
+        approve:'fa-check:#27ae60', reject:'fa-times:#e74c3c',
+        export:'fa-download:#8e44ad', login_fail:'fa-ban:#e74c3c',
+        import:'fa-upload:#f39c12', delete:'fa-trash:#e74c3c',
+      };
+      var el = document.getElementById('logs-container');
+      el.innerHTML = (d.logs||[]).map(function(log) {
+        var ic = (icons[log.action]||'fa-circle:#888').split(':');
+        return '<div class="log-item">' +
+          '<div class="log-icon" style="background:' + ic[1] + '22;color:' + ic[1] + ';width:36px;height:36px;">' +
+          '<i class="fa ' + ic[0] + '"></i></div>' +
+          '<div style="flex:1"><div class="log-action">' + log.action_display + ' — ' + log.target + '</div>' +
+          '<div class="log-meta"><i class="fa fa-user"></i> ' + (log.user||'—') + ' &nbsp;|&nbsp; <i class="fa fa-globe"></i> ' + (log.ip||'—') + ' &nbsp;|&nbsp; <i class="fa fa-clock"></i> ' + log.time + '</div>' +
+          (log.details ? '<div style="font-size:.72rem;color:#666;margin-top:2px;">' + log.details + '</div>' : '') +
+          '</div></div>';
+      }).join('') || '<div style="padding:30px;text-align:center;color:#aaa">لا توجد أنشطة</div>';
+    });
+}
+
+function exportLogs() {
+  window.open('/admin-dashboard/api/logs/export/', '_blank');
+}
+
+// ── REPORTS ──────────────────────────────────────────
+function loadReportGovs() {
+  fetch('/admin-dashboard/api/govs/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      ['rpt-gov','rpt-gov-pdf'].forEach(function(id) {
+        var sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = '<option value="">الكل</option>';
+        (d.govs||[]).forEach(function(g) {
+          var opt = document.createElement('option');
+          opt.value = g.pcode; opt.textContent = g.name_ar;
+          sel.appendChild(opt);
+        });
+      });
+      loadViolationsAdmin();
+    });
+
+  // Quick stats
+  fetch('/admin-dashboard/api/stats/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('quick-stats');
+      var rows = [
+        ['إجمالي التعديات', (d.total||0).toLocaleString('ar')],
+        ['معتمدة', (d.approved||0).toLocaleString('ar')],
+        ['في الانتظار', (d.pending||0).toLocaleString('ar')],
+        ['مرفوضة', (d.rejected||0).toLocaleString('ar')],
+        ['إجمالي المساحة م²', Math.round(d.total_area||0).toLocaleString('ar')],
+        ['مرتبطة جيوغرافياً', (d.geo_count||0).toLocaleString('ar')],
+      ];
+      el.innerHTML = rows.map(function(r) {
+        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:.82rem;">' +
+          '<span style="color:#666">' + r[0] + '</span>' +
+          '<span style="font-weight:700;color:var(--primary)">' + r[1] + '</span></div>';
+      }).join('');
+    });
+}
+
+function exportReport(fmt) {
+  var govEl    = document.getElementById(fmt==='pdf' ? 'rpt-gov-pdf' : 'rpt-gov');
+  var statusEl = document.getElementById(fmt==='pdf' ? 'rpt-status-pdf' : 'rpt-status');
+  var areaEl   = document.getElementById(fmt==='pdf' ? 'rpt-area-pdf' : 'rpt-area');
+  var qs = '/api/export/' + fmt + '/?';
+  if (govEl && govEl.value)    qs += 'gov=' + govEl.value + '&';
+  if (statusEl && statusEl.value) qs += 'status=' + statusEl.value + '&';
+  if (areaEl && areaEl.value)  qs += 'min_area=' + areaEl.value;
+  showToast('جاري إنشاء التقرير…', 'info');
+  window.open(qs, '_blank');
+}
+
+// ── CSRF ─────────────────────────────────────────────
+function getCsrfToken() {
+  var match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+// ── TOAST ─────────────────────────────────────────────
+function showToast(msg, type) {
+  var colors = {success:'#27ae60',error:'#e74c3c',info:'#3498db'};
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+    'background:' + (colors[type]||'#333') + ';color:#fff;padding:11px 22px;' +
+    'border-radius:8px;font-size:.85rem;font-weight:600;z-index:9999;' +
+    'box-shadow:0 4px 14px rgba(0,0,0,.2);font-family:inherit;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove()},300); }, 3000);
+}
+
+// ── INIT ──────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>

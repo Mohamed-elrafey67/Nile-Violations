@@ -1,0 +1,2663 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>منظومة توثيق أراضي طرح النهر</title>
+  <link rel="stylesheet" href="{% static 'violations/libs/leaflet/leaflet.css' %}"/>
+  <link rel="stylesheet" href="{% static 'violations/libs/markercluster/MarkerCluster.css' %}"/>
+  <link rel="stylesheet" href="{% static 'violations/libs/markercluster/MarkerCluster.Default.css' %}"/>
+  <script src="{% static 'violations/libs/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'violations/libs/markercluster/leaflet.markercluster.js' %}"></script>
+  <link rel="stylesheet" href="{% static 'violations/libs/fontawesome/css/all.min.css' %}"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; overflow: hidden; }
+
+    :root {
+      --primary: #0d3b6e;
+      --accent:  #e74c3c;
+      --gold:    #f39c12;
+      --green:   #27ae60;
+      --sidebar: 320px;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      position: fixed; top: 0; right: 0; left: 0; height: 56px; z-index: 2000;
+      background: linear-gradient(135deg, #0d3b6e, #1a6ea8);
+      color: #fff; display: flex; align-items: center; padding: 0 16px; gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+    #header h1 { font-size: .95rem; line-height: 1.4; }
+    #header h1 small { font-size: .72rem; opacity: .8; display: block; }
+    .hstats { margin-right: auto; display: flex; gap: 20px; }
+    .hs { text-align: center; }
+    .hs-val { font-size: 1.2rem; font-weight: 700; color: var(--gold); }
+    .hs-lbl { font-size: .62rem; opacity: .75; }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      position: fixed; top: 56px; right: 0; bottom: 0; width: var(--sidebar);
+      background: #fff; z-index: 1000; display: flex; flex-direction: column;
+      border-left: 1px solid #dce3ef; box-shadow: -2px 0 8px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+    .tabs { display: flex; border-bottom: 2px solid #e8edf5; flex-shrink: 0; }
+    .tab {
+      flex: 1; padding: 9px 4px; text-align: center; font-size: .78rem;
+      font-weight: 600; cursor: pointer; color: #666;
+      border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .2s;
+    }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab:hover { background: #f8faff; }
+
+    .panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .panel.active { display: flex; }
+
+    /* FILTERS */
+    .filters { padding: 10px 12px; overflow-y: auto; flex-shrink: 0; }
+    .fl { margin-bottom: 9px; }
+    .fl label { font-size: .74rem; color: #555; display: block; margin-bottom: 3px; font-weight: 600; }
+    .fl select, .fl input {
+      width: 100%; padding: 7px 9px; border: 1px solid #d0d7e3; border-radius: 6px;
+      font-size: .81rem; font-family: inherit; background: #fafbfd; outline: none;
+    }
+    .fl select:focus, .fl input:focus { border-color: #1a6ea8; }
+    .btn-row { display: flex; gap: 7px; margin-top: 4px; }
+    .btn {
+      flex: 1; padding: 8px; border: none; border-radius: 6px; cursor: pointer;
+      font-size: .81rem; font-weight: 600; font-family: inherit; transition: all .2s;
+    }
+    .btn-p { background: var(--primary); color: #fff; }
+    .btn-p:hover { background: #0a2f58; }
+    .btn-o { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn-o:hover { background: #f0f4f9; }
+
+    /* RESULT BAR */
+    .rbar {
+      padding: 6px 12px; background: #f0f5fb; font-size: .77rem; color: #444;
+      display: flex; justify-content: space-between; flex-shrink: 0;
+      border-bottom: 1px solid #dce3ef;
+    }
+    .rbar strong { color: var(--accent); }
+
+    /* RECORD LIST */
+    .rec-list { flex: 1; overflow-y: auto; }
+    .rec {
+      padding: 9px 12px; border-bottom: 1px solid #f0f3f8;
+      cursor: pointer; transition: background .12s;
+    }
+    .rec:hover { background: #f4f8ff; }
+    .rec-top { display: flex; justify-content: space-between; align-items: center; }
+    .rec-code { font-size: .67rem; color: #888; }
+    .rec-gov-badge {
+      font-size: .67rem; font-weight: 700; color: #2980b9;
+      background: #e8f4fd; padding: 1px 5px; border-radius: 8px;
+    }
+    .rec-village { font-weight: 700; font-size: .85rem; color: var(--primary); margin: 2px 0; }
+    .rec-desc { font-size: .75rem; color: #666; }
+    .rec-area { font-size: .72rem; color: var(--accent); font-weight: 700; margin-top: 2px; }
+    .tag { display: inline-block; padding: 1px 5px; border-radius: 8px; font-size: .64rem; font-weight: 700; margin-right: 3px; }
+    .tag-g { background: #d4edda; color: #155724; }
+    .tag-f { background: #fff3cd; color: #856404; }
+
+    /* GOV LIST */
+    .gov-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .gov-card {
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+      cursor: pointer; border: 1.5px solid #e0e8f5; transition: all .2s;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .gov-card:hover { border-color: var(--primary); background: #f4f8ff; }
+    .gov-card.active-gov { background: #e8f0ff; border-color: var(--primary); }
+    .gov-name { font-weight: 700; font-size: .87rem; color: var(--primary); }
+    .gov-count { font-size: .8rem; color: var(--accent); font-weight: 600; }
+    .gov-area { font-size: .7rem; color: #888; }
+
+    .loading-msg { text-align: center; padding: 24px; color: #888; font-size: .82rem; }
+
+    /* ── MAP ── */
+    #map {
+      position: fixed;
+      top: 56px;
+      right: var(--sidebar);
+      bottom: 0;
+      left: 0;
+      z-index: 500;
+    }
+
+    /* ── DETAIL PANEL ── */
+    #detail {
+      position: fixed; bottom: 20px; left: 20px;
+      width: 285px; background: #fff; border-radius: 10px;
+      box-shadow: 0 4px 22px rgba(0,0,0,.18); z-index: 1500;
+      display: none; overflow: hidden;
+    }
+    #detail.open { display: block; }
+    .det-head {
+      background: var(--primary); color: #fff; padding: 9px 13px;
+      font-weight: 600; display: flex; justify-content: space-between;
+      align-items: center; font-size: .84rem;
+    }
+    .det-close { cursor: pointer; opacity: .7; }
+    .det-close:hover { opacity: 1; }
+    .det-body { padding: 12px; font-size: .79rem; }
+    .det-row {
+      display: flex; justify-content: space-between;
+      padding: 4px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .det-row:last-child { border: none; }
+    .det-k { color: #666; }
+    .det-v { font-weight: 600; color: var(--primary); text-align: left; max-width: 58%; word-break: break-word; }
+    .det-area { background: #fff3cd; border-radius: 6px; padding: 8px; margin-bottom: 10px; text-align: center; }
+    .det-area-val { font-size: 1.15rem; font-weight: 700; color: var(--accent); }
+    .det-area-lbl { font-size: .69rem; color: #666; }
+
+    /* ── LEGEND ── */
+    #legend {
+      position: fixed; bottom: 20px; right: calc(var(--sidebar) + 14px);
+      background: rgba(255,255,255,.95); border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.14);
+      padding: 9px 13px; z-index: 1000; font-size: .74rem; min-width: 150px;
+    }
+    .leg-title { font-weight: 700; color: var(--primary); margin-bottom: 5px; font-size: .77rem; }
+    .leg-item { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+    .leg-sq { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    .leg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── LAYER CONTROL ── */
+    #lyr-ctrl {
+      position: fixed; top: 70px; left: 14px;
+      background: rgba(255,255,255,.95); border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.14);
+      padding: 8px 12px; z-index: 1000; font-size: .75rem;
+    }
+    #lyr-ctrl .lyr-title { font-weight: 700; color: var(--primary); margin-bottom: 5px; }
+    #lyr-ctrl label { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 2px 0; }
+
+    /* scrollbar */
+    .rec-list::-webkit-scrollbar, .gov-list::-webkit-scrollbar,
+    .filters::-webkit-scrollbar { width: 4px; }
+    .rec-list::-webkit-scrollbar-thumb, .gov-list::-webkit-scrollbar-thumb,
+    .filters::-webkit-scrollbar-thumb { background: #bcd; border-radius: 3px; }
+
+    /* تنسيق رسائل التنبيه */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 9999;
+}
+.toast-msg {
+    background: var(--primary);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-top: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+    /* ── NEWS TICKER ── */
+    #ticker-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 2000;
+      background: linear-gradient(135deg, #0d3b6e, #1a6ea8);
+      color: #fff; height: 30px; display: flex; align-items: center;
+      overflow: hidden; box-shadow: 0 -2px 8px rgba(0,0,0,.2);
+    }
+    #ticker-label {
+      background: #e74c3c; color: #fff;
+      padding: 0 14px; height: 100%; display: flex; align-items: center;
+      font-size: .78rem; font-weight: 700; white-space: nowrap;
+      flex-shrink: 0; letter-spacing: .5px;
+    }
+    #ticker-track {
+      flex: 1; overflow: hidden; position: relative; height: 100%;
+    }
+    #ticker-text {
+      position: absolute; white-space: nowrap;
+      font-size: .8rem; font-weight: 600; color: #fff;
+      top: 50%; transform: translateY(-50%);
+      animation: ticker-scroll 18s linear infinite;
+      padding-right: 100%;
+    }
+    #ticker-text i { color: #f39c12; margin: 0 6px; }
+    @keyframes ticker-scroll {
+      0%   { right: -100%; }
+      100% { right: 100%;  }
+    }
+    #ticker-text:hover { animation-play-state: paused; cursor: default; }
+    /* حماية من النسخ */
+    body { -webkit-user-select: none; -moz-user-select: none;
+           -ms-user-select: none; user-select: none; }
+    /* السماح بالنسخ داخل النوافذ والنماذج */
+    #modal-form, #modal-detail, #modal-pending, #modal-rejected,
+    .det-body, input, textarea, select {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      user-select: text !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div style="font-size:1.8rem;color:#74b9ff"><i class="fa fa-water"></i></div>
+  <div>
+    <h1>منظومة توثيق أراضي طرح النهر
+      <small>جمهورية مصر العربية — وزارة الموارد المائية والري</small>
+    </h1>
+  </div>
+  <div class="hstats">
+    <div class="hs">
+      <div class="hs-val" id="h-count">{{ overall.total_count|default:"0" }}</div>
+      <div class="hs-lbl">إجمالي التعديات</div>
+    </div>
+    <div class="hs">
+      <div class="hs-val" id="h-area">—</div>
+      <div class="hs-lbl">المساحة م²</div>
+    </div>
+    <div class="hs">
+      <div class="hs-val" id="h-govs">{{ govs_with_data|length }}</div>
+      <div class="hs-lbl">محافظات مُدرَجة</div>
+    </div>
+    <div class="hs">
+      <div class="hs-val" id="h-geo">{{ overall.geo_count|default:"0" }}</div>
+      <div class="hs-lbl">مرتبطة جغرافياً</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-right:10px;">
+    {% if role == "data_entry" or role == "supervisor" or role == "manager" %}
+    <button onclick="openAddForm()" style="padding:7px 14px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:700;">
+      <i class="fa fa-plus"></i> إضافة تعدٍّ
+    </button>
+    {% endif %}
+    {% if role == "supervisor" or role == "manager" %}
+    <button onclick="openPendingList()" style="padding:7px 14px;background:#f39c12;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:700;position:relative;" id="btn-pending">
+      <i class="fa fa-clock"></i> في الانتظار
+      <span id="pending-badge" style="display:none;background:#e74c3c;padding:1px 6px;border-radius:10px;margin-right:4px;font-size:.75rem;"></span>
+    </button>
+    {% endif %}
+    <div style="font-size:.75rem;text-align:center;opacity:.85;">
+      <div style="font-weight:700;">{{ user.get_full_name|default:user.username }}</div>
+      <div style="opacity:.75;">{{ role }}</div>
+    </div>
+    <button onclick="exportData('excel')" style="padding:6px 10px;background:rgba(39,174,96,.8);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">
+      <i class="fa fa-file-excel"></i> Excel
+    </button>
+    <button onclick="exportData('pdf')" style="padding:6px 10px;background:rgba(231,76,60,.8);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">
+      <i class="fa fa-file-pdf"></i> PDF
+    </button>
+    {% if role == "supervisor" or role == "manager" %}
+    <button onclick="openRejectedList()" style="padding:6px 10px;background:rgba(127,140,141,.8);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">
+      <i class="fa fa-ban"></i> المرفوضة
+      <span id="rejected-badge" style="display:none;background:#e74c3c;padding:1px 6px;border-radius:10px;margin-right:4px;font-size:.72rem;"></span>
+    </button>
+    {% endif %}
+    {% if role == "manager" %}
+    <a href="/admin-dashboard/" target="_blank" style="padding:6px 10px;background:rgba(142,68,173,.8);color:#fff;border-radius:6px;text-decoration:none;font-size:.78rem;font-weight:600;">
+      <i class="fa fa-gauge"></i> الإدارة
+    </a>
+    {% endif %}
+    <button onclick="openAIAssistant()" title="المساعد الذكي"
+      style="padding:6px 12px;background:linear-gradient(135deg,#8e44ad,#9b59b6);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;">
+      <i class="fa fa-robot"></i> مساعد ذكي
+    </button>
+    <a href="/logout/" style="padding:6px 10px;background:rgba(255,255,255,.15);color:#fff;border-radius:6px;text-decoration:none;font-size:.8rem;">
+      <i class="fa fa-right-from-bracket"></i>
+    </a>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('filter')"><i class="fa fa-filter"></i> فلترة</div>
+    <div class="tab"        onclick="switchTab('govs')"><i class="fa fa-flag"></i> المحافظات</div>
+  </div>
+
+  <!-- FILTER PANEL -->
+  <div class="panel active" id="panel-filter">
+    <div class="filters">
+      <div class="fl">
+        <label>المحافظة</label>
+        <select id="f-gov" onchange="onGovChange()">
+          <option value="">— جميع المحافظات —</option>
+          {% for g in govs_with_data %}
+          <option value="{{ g.pcode }}">{{ g.name_ar }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="fl">
+        <label>المركز الإداري</label>
+        <select id="f-district" onchange="onDistrictChange()">
+          <option value="">— جميع المراكز —</option>
+        </select>
+      </div>
+      <div class="fl">
+        <label>القرية / المدينة</label>
+        <select id="f-village" onchange="scheduleFilter()">
+          <option value="">— جميع القرى —</option>
+        </select>
+      </div>
+      <div class="fl">
+        <label>وصف الاستغلال</label>
+        <select id="f-desc" onchange="scheduleFilter()">
+          <option value="">— الكل —</option>
+        </select>
+      </div>
+      <div class="fl">
+        <label>بحث (اسم / رمز / مستغل)</label>
+        <input type="text" id="f-search" placeholder="ابحث هنا…" oninput="scheduleFilter()">
+      </div>
+      <div class="fl">
+        <label>الحد الأدنى للمساحة (م²)</label>
+        <input type="number" id="f-area" placeholder="0" min="0" oninput="scheduleFilter()">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-p" onclick="applyFilter()"><i class="fa fa-search"></i> تطبيق</button>
+        <button class="btn btn-o" onclick="resetFilter()"><i class="fa fa-rotate-left"></i> إعادة</button>
+      </div>
+    </div>
+    <div class="rbar">
+      <span>النتائج: <strong id="res-count">0</strong></span>
+      <span>مجموع: <strong id="res-area">0</strong> م²</span>
+    </div>
+    <div class="rec-list" id="rec-list">
+      <div class="loading-msg"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>
+    </div>
+  </div>
+
+  <!-- GOVS PANEL -->
+  <div class="panel" id="panel-govs">
+    <div class="gov-list" id="gov-list">
+      <div class="loading-msg"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYER CONTROL -->
+<div id="lyr-ctrl">
+  <div class="lyr-title">الطبقات</div>
+  <label><input type="checkbox" id="lyr-poly"  checked onchange="toggleLayer('poly')"> حدود القرى</label>
+  <label><input type="checkbox" id="lyr-choro"         onchange="toggleLayer('choro')"> خريطة حرارية</label>
+  <label><input type="checkbox" id="lyr-pts"   checked onchange="toggleLayer('pts')"> نقاط التعدي</label>
+</div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="leg-title">دليل الألوان</div>
+  <div class="leg-item">
+    <div class="leg-sq" style="background:#e74c3c;opacity:.65;border:1px solid #c0392b"></div>
+    <span>قرية بها تعديات</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-sq" style="background:#bdc3c7;opacity:.4;border:1px solid #95a5a6"></div>
+    <span>قرية بلا تعديات</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-dot" style="background:#e74c3c"></div>
+    <span>> 5000 م²</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-dot" style="background:#f39c12"></div>
+    <span>1000 – 5000 م²</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-dot" style="background:#27ae60"></div>
+    <span>أقل من 1000 م²</span>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div id="detail">
+  <div class="det-head">
+    <span id="d-code">—</span>
+    <span class="det-close" onclick="closeDetail()"><i class="fa fa-times"></i></span>
+  </div>
+  <div class="det-body">
+    <div class="det-area">
+      <div class="det-area-val" id="d-total">—</div>
+      <div class="det-area-lbl">المساحة الإجمالية (م²)</div>
+    </div>
+    <div class="det-row"><span class="det-k">المحافظة</span><span class="det-v" id="d-gov">—</span></div>
+    <div class="det-row"><span class="det-k">المركز</span><span class="det-v" id="d-dist">—</span></div>
+    <div class="det-row"><span class="det-k">القرية</span><span class="det-v" id="d-vill">—</span></div>
+    <div class="det-row"><span class="det-k">المستغل</span><span class="det-v" id="d-occ">—</span></div>
+    <div class="det-row"><span class="det-k">الحوض</span><span class="det-v" id="d-basin">—</span></div>
+    <div class="det-row"><span class="det-k">وصف الاستغلال</span><span class="det-v" id="d-desc">—</span></div>
+    <div class="det-row"><span class="det-k">تعدي على الجسر</span><span class="det-v" id="d-nile">—</span></div>
+    <div class="det-row"><span class="det-k">تعدي على المنفعة</span><span class="det-v" id="d-pub">—</span></div>
+    <div class="det-row"><span class="det-k">دقة الموقع</span><span class="det-v" id="d-geo">—</span></div>
+  </div>
+</div>
+
+
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- CSRF Token (hidden form to ensure cookie is set) -->
+<form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
+<!-- CSRF Token Helper -->
+<form id="csrf-form" style="display:none;">{% csrf_token %}</form>
+
+
+<!-- MODAL OVERLAY -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="modal-overlay" onclick="closeAllModals()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;"></div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- ADD / EDIT FORM MODAL -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="modal-form" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:580px;max-width:96vw;max-height:92vh;background:#fff;border-radius:14px;
+  box-shadow:0 8px 40px rgba(0,0,0,.35);z-index:3100;overflow:hidden;flex-direction:column;">
+
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#0d3b6e,#1a6ea8);color:#fff;padding:14px 18px;
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-weight:700;font-size:.95rem;" id="form-title">إضافة تعدٍّ جديد</span>
+    <span onclick="closeAllModals()" style="cursor:pointer;font-size:1.1rem;opacity:.8;">✕</span>
+  </div>
+
+  <!-- Progress Bar -->
+  <div style="display:flex;background:#f0f4f9;border-bottom:1px solid #dce3ef;flex-shrink:0;" id="form-progress">
+    <div class="fstep active" id="fstep-1" onclick="goStep(1)">
+      <span class="fstep-num">١</span><span class="fstep-lbl">الموقع الإداري</span>
+    </div>
+    <div class="fstep" id="fstep-2" onclick="goStep(2)">
+      <span class="fstep-num">٢</span><span class="fstep-lbl">بيانات التعدي</span>
+    </div>
+    <div class="fstep" id="fstep-3" onclick="goStep(3)">
+      <span class="fstep-num">٣</span><span class="fstep-lbl">المساحات</span>
+    </div>
+    <div class="fstep" id="fstep-4" onclick="goStep(4)">
+      <span class="fstep-num">٤</span><span class="fstep-lbl">الموقع والحفظ</span>
+    </div>
+  </div>
+
+  <!-- Form Body -->
+  <div style="flex:1;overflow-y:auto;padding:20px;">
+    <input type="hidden" id="edit-id" value="">
+    <input type="hidden" id="fm-village-pcode" value="">
+
+    <!-- STEP 1: الموقع الإداري -->
+    <div id="step-1" class="form-step">
+      <div class="step-title"><i class="fa fa-map-marker-alt"></i> الموقع الإداري</div>
+
+      <div class="mf">
+        <label>المحافظة <span class="req">*</span></label>
+        <select id="fm-gov" onchange="onFormGovChange()">
+          <option value="">— اختر المحافظة —</option>
+          {% for g in all_govs %}
+          <option value="{{ g.pcode }}">{{ g.name_ar }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mf mt12">
+        <label>المركز الإداري <span class="req">*</span></label>
+        <select id="fm-district" disabled onchange="onFormDistrictChange()">
+          <option value="">— اختر المحافظة أولاً —</option>
+        </select>
+        <div class="field-hint" id="hint-district">اختر المحافظة أولاً لتفعيل هذه القائمة</div>
+      </div>
+
+      <div class="mf mt12">
+        <label>القرية / المدينة <span class="req">*</span></label>
+        <select id="fm-village-select" disabled onchange="onFormVillageChange()">
+          <option value="">— اختر المركز أولاً —</option>
+        </select>
+        <div class="field-hint" id="hint-village">اختر المركز أولاً لتفعيل هذه القائمة</div>
+      </div>
+
+      <div class="mf mt12" id="fm-village-custom-wrap" style="display:none;">
+        <label>أو أدخل اسم القرية يدوياً</label>
+        <input type="text" id="fm-village" placeholder="في حال عدم وجودها في القائمة">
+      </div>
+    </div>
+
+    <!-- STEP 2: بيانات التعدي -->
+    <div id="step-2" class="form-step" style="display:none;">
+      <div class="step-title"><i class="fa fa-file-alt"></i> بيانات التعدي</div>
+
+      <div class="mf">
+        <label>اسم المستغل <span class="req">*</span></label>
+        <input type="text" id="fm-occupant" placeholder="الاسم الكامل للمستغل أو الجهة">
+      </div>
+
+      <div class="mf mt12">
+        <label>اسم الحوض <span class="req">*</span></label>
+        <input type="text" id="fm-basin" placeholder="مثال: حوض الساحل نمره 13">
+      </div>
+
+      <div class="mf mt12">
+        <label>وصف الاستغلال <span class="req">*</span></label>
+        <input type="text" id="fm-description" placeholder="مثال: مبني 2 دور، فضاء، مزروعة...">
+      </div>
+
+      <div class="mf mt12">
+        <label>ملاحظات ميدانية</label>
+        <textarea id="fm-notes" rows="3" placeholder="أي ملاحظات إضافية من الميدان..."
+          style="width:100%;padding:9px;border:1.5px solid #d0d7e3;border-radius:7px;
+          font-family:inherit;font-size:.83rem;resize:vertical;outline:none;"></textarea>
+      </div>
+    </div>
+
+    <!-- STEP 3: المساحات -->
+    <div id="step-3" class="form-step" style="display:none;">
+      <div class="step-title"><i class="fa fa-ruler-combined"></i> المساحات (م²)</div>
+
+      <div style="background:#e8f4fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.8rem;color:#1a6ea8;">
+        <i class="fa fa-info-circle"></i> يُحسب المسطح الإجمالي تلقائياً من مجموع الحقول الثلاثة
+      </div>
+
+      <div class="mf">
+        <label>تعدي على جسر نهر النيل م²</label>
+        <input type="number" id="fm-nile" placeholder="0" min="0" step="0.01" oninput="calcTotal()">
+      </div>
+      <div class="mf mt12">
+        <label>تعدي على المنفعة العامة م²</label>
+        <input type="number" id="fm-public" placeholder="0" min="0" step="0.01" oninput="calcTotal()">
+      </div>
+      <div class="mf mt12">
+        <label>المسطح خارج الحياض م²</label>
+        <input type="number" id="fm-outside" placeholder="0" min="0" step="0.01" oninput="calcTotal()">
+      </div>
+
+      <div style="margin-top:16px;background:#fff3cd;border-radius:8px;padding:12px 16px;
+        display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:700;color:#856404;font-size:.85rem;">المسطح الإجمالي م²</span>
+        <span id="fm-total-display" style="font-size:1.3rem;font-weight:700;color:#e74c3c;">0.00</span>
+      </div>
+      <input type="hidden" id="fm-total">
+    </div>
+
+    <!-- STEP 4: الموقع والحفظ -->
+    <div id="step-4" class="form-step" style="display:none;">
+      <div class="step-title"><i class="fa fa-map-pin"></i> الموقع الجغرافي</div>
+
+      <div id="location-status" style="border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:.82rem;
+        background:#d4edda;color:#155724;border:1px solid #c3e6cb;">
+        <i class="fa fa-check-circle"></i>
+        <span id="location-status-text">تم تحديد الموقع تلقائياً من مركز القرية</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div class="mf">
+          <label>خط العرض</label>
+          <input type="number" id="fm-lat" placeholder="31.036" step="0.000001" readonly
+            style="background:#f8f9fa;">
+        </div>
+        <div class="mf">
+          <label>خط الطول</label>
+          <input type="number" id="fm-lon" placeholder="31.380" step="0.000001" readonly
+            style="background:#f8f9fa;">
+        </div>
+      </div>
+
+      <button onclick="pickFromMap()" style="width:100%;padding:10px;background:#3498db;color:#fff;
+        border:none;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.85rem;
+        font-weight:600;margin-bottom:16px;">
+        <i class="fa fa-map-pin"></i> تحديد موقع أدق بالنقر على الخريطة
+      </button>
+
+      <!-- Summary -->
+      <div style="background:#f8f9fa;border-radius:8px;padding:14px;font-size:.82rem;">
+        <div style="font-weight:700;color:#0d3b6e;margin-bottom:10px;font-size:.88rem;">
+          <i class="fa fa-clipboard-check"></i> ملخص البيانات
+        </div>
+        <div id="form-summary"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Navigation -->
+  <div style="padding:12px 18px;border-top:1px solid #eee;display:flex;gap:8px;
+    flex-shrink:0;background:#fafbfd;align-items:center;">
+    <button id="btn-prev" onclick="prevStep()" style="padding:9px 18px;background:#fff;
+      color:#666;border:1.5px solid #ddd;border-radius:7px;cursor:pointer;
+      font-family:inherit;font-size:.83rem;display:none;">
+      <i class="fa fa-arrow-right"></i> السابق
+    </button>
+    <div style="flex:1;text-align:center;font-size:.78rem;color:#888;" id="step-indicator">
+      الخطوة 1 من 4
+    </div>
+    <button id="btn-next" onclick="nextStep()" style="padding:9px 18px;background:#0d3b6e;
+      color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;
+      font-size:.83rem;font-weight:600;">
+      التالي <i class="fa fa-arrow-left"></i>
+    </button>
+    <button id="btn-save" onclick="saveViolation()" style="display:none;padding:9px 20px;
+      background:#27ae60;color:#fff;border:none;border-radius:7px;cursor:pointer;
+      font-family:inherit;font-size:.85rem;font-weight:700;">
+      <i class="fa fa-save"></i> حفظ
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PENDING LIST MODAL -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="modal-pending" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:700px;max-width:95vw;max-height:90vh;background:#fff;border-radius:12px;
+  box-shadow:0 8px 40px rgba(0,0,0,.3);z-index:3100;overflow:hidden;flex-direction:column;">
+  <div style="background:linear-gradient(135deg,#e67e22,#f39c12);color:#fff;padding:14px 18px;
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-weight:700;font-size:.95rem;">السجلات في انتظار الموافقة</span>
+    <span onclick="closeAllModals()" style="cursor:pointer;font-size:1.1rem;opacity:.8;">✕</span>
+  </div>
+  <div id="pending-list" style="flex:1;overflow-y:auto;padding:12px;">
+    <div style="text-align:center;padding:20px;color:#888;">جاري التحميل…</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- DETAIL / REVIEW MODAL -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="modal-detail" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:600px;max-width:95vw;max-height:90vh;background:#fff;border-radius:12px;
+  box-shadow:0 8px 40px rgba(0,0,0,.3);z-index:3100;overflow:hidden;flex-direction:column;">
+  <div style="background:linear-gradient(135deg,#0d3b6e,#1a6ea8);color:#fff;padding:14px 18px;
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-weight:700;font-size:.95rem;" id="detail-modal-title">تفاصيل التعدي</span>
+    <span onclick="closeAllModals()" style="cursor:pointer;font-size:1.1rem;opacity:.8;">✕</span>
+  </div>
+  <div id="detail-modal-body" style="flex:1;overflow-y:auto;padding:16px;"></div>
+  <div id="detail-modal-actions" style="padding:12px 18px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;background:#fafbfd;"></div>
+</div>
+
+<style>
+  .mf { display:flex; flex-direction:column; gap:4px; }
+  .mf label { font-size:.76rem; font-weight:600; color:#555; }
+  .mf input, .mf select {
+    padding:8px 10px; border:1.5px solid #d0d7e3; border-radius:6px;
+    font-size:.83rem; font-family:inherit; outline:none;
+  }
+  .mf input:focus, .mf select:focus { border-color:#1a6ea8; }
+  .status-badge {
+    display:inline-block; padding:3px 10px; border-radius:10px;
+    font-size:.72rem; font-weight:700;
+  }
+  .status-pending  { background:#fff3cd; color:#856404; }
+  .status-approved { background:#d4edda; color:#155724; }
+  .status-rejected { background:#f8d7da; color:#721c24; }
+  .note-item { background:#f8f9fa; border-radius:6px; padding:8px 10px; margin-bottom:6px; }
+  .note-user { font-size:.72rem; color:#888; margin-top:4px; }
+  #modal-form, #modal-pending, #modal-detail { display:none !important; }
+  #modal-form.open, #modal-pending.open, #modal-detail.open { display:flex !important; }
+
+  @keyframes pulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.08); box-shadow: 0 0 12px rgba(243,156,18,.8); }
+    100% { transform: scale(1); }
+  }
+
+  /* Stepper */
+  .fstep {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    padding:9px 4px; cursor:pointer; border-bottom:3px solid transparent;
+    transition:all .2s; font-size:.72rem; color:#888; gap:3px;
+  }
+  .fstep.active { border-bottom-color:#0d3b6e; color:#0d3b6e; background:#fff; }
+  .fstep.done   { border-bottom-color:#27ae60; color:#27ae60; }
+  .fstep.active .fstep-num { background:#0d3b6e; color:#fff; }
+  .fstep.done   .fstep-num { background:#27ae60; color:#fff; }
+  .fstep-num {
+    width:22px; height:22px; border-radius:50%; background:#ddd; color:#666;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.72rem; font-weight:700; transition:all .2s;
+  }
+  .fstep-lbl { font-size:.68rem; text-align:center; }
+  .step-title {
+    font-weight:700; font-size:.9rem; color:#0d3b6e;
+    margin-bottom:16px; padding-bottom:8px;
+    border-bottom:2px solid #e8edf5;
+  }
+  .mt12 { margin-top:12px; }
+  .req  { color:#e74c3c; }
+  .field-hint { font-size:.72rem; color:#aaa; margin-top:3px; }
+  .mf select:disabled, .mf input:disabled {
+    background:#f5f5f5; color:#bbb; cursor:not-allowed;
+  }
+</style>
+
+
+
+
+
+
+<script>
+
+// ══════════════════════════════════════════
+// حماية الكود — Code Protection
+// ══════════════════════════════════════════
+(function() {
+  // منع النقر بالزر الأيمن
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault(); return false;
+  });
+
+  // منع اختصارات المطور
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F12') { e.preventDefault(); return false; }
+    if (e.ctrlKey && e.shiftKey && ['I','J','C','K'].includes(e.key.toUpperCase())) {
+      e.preventDefault(); return false;
+    }
+    if (e.ctrlKey && ['U','S'].includes(e.key.toUpperCase())) {
+      e.preventDefault(); return false;
+    }
+  });
+
+  // كشف DevTools
+  setInterval(function() {
+    var threshold = 160;
+    if (window.outerWidth - window.innerWidth > threshold ||
+        window.outerHeight - window.innerHeight > threshold) {
+      document.body.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;' +
+        'height:100vh;background:#0d3b6e;color:#fff;font-family:Arial;' +
+        'flex-direction:column;gap:16px;text-align:center;">' +
+        '<div style="font-size:4rem;">🛡️</div>' +
+        '<h2 style="margin:0">غير مصرح بالوصول</h2>' +
+        '<p style="opacity:.8">منظومة توثيق أراضي طرح النهر</p>' +
+        '<p style="font-size:.85rem;opacity:.6">تصميم م/ محمد الرافعي المكباتي</p>' +
+        '</div>';
+    }
+  }, 1500);
+
+  // تعطيل console في الإنتاج فقط
+  if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    var noop = function() {};
+    try {
+      Object.defineProperty(window, 'console', {
+        value: {log:noop,warn:noop,error:noop,info:noop,debug:noop},
+        writable: false,
+      });
+    } catch(e) {}
+  }
+})();
+
+// ══════════════════════════════════════════
+// GLOBAL VARIABLES — defined first
+// ══════════════════════════════════════════
+var ROLE            = "{{ role }}";
+var pickingLocation = false;
+var pickMarker      = null;
+
+function showToast(message, type = 'info') {
+    // التأكد من وجود حاوية الرسائل
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-msg';
+    
+    // تغيير اللون بناءً على النوع
+    if (type === 'error') toast.style.background = '#e74c3c';
+    if (type === 'success') toast.style.background = '#27ae60';
+
+    toast.innerHTML = `<i class="fa fa-info-circle"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+
+    // إخفاء الرسالة تلقائياً بعد 4 ثوانٍ
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = '0.5s';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
+// ══════════════════════════════════════════
+// MODAL HELPERS — defined early (used by openDetailModal)
+// ══════════════════════════════════════════
+function openModal(id) {
+  var overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.style.display = 'block';
+  var el = document.getElementById(id);
+  if (!el) { console.error('Modal not found:', id); return; }
+  el.classList.add('open');
+  el.style.display = 'flex';
+}
+function closeAllModals() {
+  var overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+  ['modal-form','modal-pending','modal-detail'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('open');
+    el.style.display = 'none';
+  });
+  if (typeof pickingLocation !== 'undefined') pickingLocation = false;
+  if (typeof map !== 'undefined') map.getContainer().style.cursor = '';
+}
+function closeDetail() {
+  var el = document.getElementById('detail');
+  if (el) el.classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+// MAP INIT
+// ══════════════════════════════════════════
+var map = L.map('map').setView([27.0, 30.0], 6);
+
+// بعد تحميل الخريطة نضبط حدود مصر كاملة
+setTimeout(function() {
+  // حدود مصر الجغرافية الكاملة
+  var egyptBounds = L.latLngBounds(
+    [21.8, 24.6],  // الجنوب الغربي (قرب أسوان + الحدود الليبية)
+    [31.8, 37.2]   // الشمال الشرقي (الإسكندرية + سيناء)
+  );
+  map.fitBounds(egyptBounds);
+}, 100);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Esri World Imagery', maxZoom: 19
+}).addTo(map);
+
+L.control.layers({
+  'صورة جوية': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
+  'خريطة عادية': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19})
+}, {}, {position: 'bottomleft'}).addTo(map);
+
+var polyGroup  = L.layerGroup().addTo(map);
+var choroGroup = L.layerGroup();
+var ptCluster  = L.markerClusterGroup({maxClusterRadius: 50});
+map.addLayer(ptCluster);
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+var allRecords    = [];
+var loadedGovGeos = {};
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+function switchTab(name) {
+  var tabs = document.querySelectorAll('.tab');
+  tabs[0].classList.toggle('active', name === 'filter');
+  tabs[1].classList.toggle('active', name === 'govs');
+  document.getElementById('panel-filter').classList.toggle('active', name === 'filter');
+  document.getElementById('panel-govs').classList.toggle('active',  name === 'govs');
+}
+
+// ══════════════════════════════════════════
+// GOVS PANEL
+// ══════════════════════════════════════════
+function loadGovsPanel() {
+  fetch('/api/govs-summary/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('gov-list');
+      if (!data.governorates || !data.governorates.length) {
+        el.innerHTML = '<div class="loading-msg">لا توجد بيانات مستوردة بعد</div>';
+        return;
+      }
+      el.innerHTML = data.governorates.map(function(g) {
+        var count = (g.count || 0).toLocaleString('ar');
+        var area  = Math.round(g.total_area || 0).toLocaleString('ar');
+        return '<div class="gov-card" id="gc-' + g.governorate__pcode + '" onclick="selectGov(\'' + g.governorate__pcode + '\',\'' + g.governorate__name_ar + '\')">' +
+          '<div><div class="gov-name">' + g.governorate__name_ar + '</div>' +
+          '<div class="gov-area">' + area + ' م²</div></div>' +
+          '<div><div class="gov-count">' + count + ' تعدٍّ</div></div>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+function selectGov(pcode, name) {
+  document.querySelectorAll('.gov-card').forEach(function(c) { c.classList.remove('active-gov'); });
+  var card = document.getElementById('gc-' + pcode);
+  if (card) card.classList.add('active-gov');
+  document.getElementById('f-gov').value = pcode;
+  switchTab('filter');
+  onGovChange();
+}
+
+// ══════════════════════════════════════════
+// GEO POLYGONS
+// ══════════════════════════════════════════
+function loadGovGeo(govPcode) {
+  if (!govPcode) { polyGroup.clearLayers(); choroGroup.clearLayers(); return; }
+  if (loadedGovGeos[govPcode]) {
+    renderPolygons(govPcode, loadedGovGeos[govPcode]);
+    return;
+  }
+  fetch('/api/geo/' + govPcode + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      loadedGovGeos[govPcode] = data.polygons;
+      renderPolygons(govPcode, data.polygons);
+    });
+}
+
+function renderPolygons(govPcode, polys) {
+  polyGroup.clearLayers();
+  choroGroup.clearLayers();
+
+  var counts = {};
+  allRecords.forEach(function(r) {
+    if (r.village_pcode) counts[r.village_pcode] = (counts[r.village_pcode] || 0) + 1;
+  });
+  var maxCount = Math.max.apply(null, Object.values(counts).concat([1]));
+
+  polys.forEach(function(v) {
+    var cnt   = counts[v.pcode] || 0;
+    var color = cnt > 0 ? '#e74c3c' : '#bdc3c7';
+    var fopac = cnt > 0 ? 0.5 : 0.18;
+
+    v.rings.forEach(function(ring) {
+      var poly = L.polygon(ring, { color: color, weight: 1.5, fillColor: color, fillOpacity: fopac });
+      poly.bindTooltip('<b>' + v.name_ar + '</b><br>' + v.district_ar + (cnt ? '<br>التعديات: <b>' + cnt + '</b>' : ''), { sticky: true });
+      poly.on('click', function() { filterByPcode(v.pcode); });
+      polyGroup.addLayer(poly);
+
+      if (cnt > 0 && document.getElementById('lyr-choro').checked) {
+        var t  = cnt / maxCount;
+        var r2 = Math.round(200 + 55 * t);
+        var b2 = Math.round(200 * (1 - t));
+        L.polygon(ring, { color: '#555', weight: .5, fillColor: 'rgb(' + r2 + ',60,' + b2 + ')', fillOpacity: .7 }).addTo(choroGroup);
+      }
+    });
+  });
+}
+
+function filterByPcode(pcode) {
+  var gov = document.getElementById('f-gov').value;
+  loadData({ gov: gov, pcode: pcode });
+}
+
+// ══════════════════════════════════════════
+// FILTER OPTIONS
+// ══════════════════════════════════════════
+function onGovChange() {
+  var gov = document.getElementById('f-gov').value;
+  ['f-district', 'f-village', 'f-desc'].forEach(function(id) {
+    document.getElementById(id).innerHTML = '<option value="">— جميع —</option>';
+  });
+  if (gov) {
+    fetch('/api/filter-options/?gov=' + gov)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        fillSelect('f-district', d.districts);
+        fillSelect('f-village',  d.villages);
+        fillSelect('f-desc',     d.descriptions);
+      });
+    loadGovGeo(gov);
+  }
+  applyFilter();
+}
+
+function onDistrictChange() {
+  var gov      = document.getElementById('f-gov').value;
+  var district = document.getElementById('f-district').value;
+
+  // Reset village dropdown
+  document.getElementById('f-village').innerHTML = '<option value="">— جميع القرى —</option>';
+
+  // Build query params
+  var params = '';
+  if (gov)      params += '?gov=' + encodeURIComponent(gov);
+  if (district) params += (params ? '&' : '?') + 'district=' + encodeURIComponent(district);
+
+  if (gov || district) {
+    fetch('/api/filter-options/' + params)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        fillSelect('f-village', d.villages);
+        fillSelect('f-desc',    d.descriptions);
+      });
+  }
+  scheduleFilter();
+}
+
+function fillSelect(id, items) {
+  var el = document.getElementById(id);
+  (items || []).forEach(function(v) {
+    if (!v) return;
+    var opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    el.appendChild(opt);
+  });
+}
+
+// ══════════════════════════════════════════
+// LOAD DATA
+// ══════════════════════════════════════════
+function buildParams(extra) {
+  var p = {};
+  var gov  = document.getElementById('f-gov').value;
+  var dist = document.getElementById('f-district').value;
+  var vill = document.getElementById('f-village').value;
+  var desc = document.getElementById('f-desc').value;
+  var srch = document.getElementById('f-search').value.trim();
+  var area = document.getElementById('f-area').value;
+  if (gov)  p.gov         = gov;
+  if (dist) p.district    = dist;
+  if (vill) p.village     = vill;
+  if (desc) p.description = desc;
+  if (srch) p.search      = srch;
+  if (area) p.min_area    = area;
+  if (extra) Object.assign(p, extra);
+  return p;
+}
+
+function loadData(params) {
+  params = params || {};
+  document.getElementById('rec-list').innerHTML =
+    '<div class="loading-msg"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>';
+  var qs = new URLSearchParams(params).toString();
+  fetch('/api/violations/?' + qs)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      allRecords = data.records;
+      renderList(allRecords);
+      renderMarkers(allRecords);
+      updateSummary(data.summary);
+      var gov = params.gov || document.getElementById('f-gov').value;
+      if (gov && loadedGovGeos[gov]) renderPolygons(gov, loadedGovGeos[gov]);
+    });
+}
+
+// ══════════════════════════════════════════
+// RENDER LIST
+// ══════════════════════════════════════════
+function renderList(records) {
+  var el = document.getElementById('rec-list');
+  if (!records.length) {
+    el.innerHTML = '<div class="loading-msg">لا توجد نتائج مطابقة</div>';
+    return;
+  }
+
+  var html = records.slice(0, 300).map(function(r) {
+    var govName  = r['governorate__name_ar'] || '—';
+    var area     = Math.round(r.area_total || 0).toLocaleString('ar');
+
+    // شارة دقة الموقع
+    var geoTag = r.geo_exact
+      ? '<span class="tag tag-g" title="إحداثيات دقيقة">GPS✓</span>'
+      : '<span class="tag tag-f" title="إحداثيات تقديرية">تقديري</span>';
+
+    // شارة الحالة
+    var statusTag = '';
+    if (r.status === 'pending')
+      statusTag = '<span class="tag" style="background:#fff3cd;color:#856404;">انتظار</span>';
+    else if (r.status === 'rejected')
+      statusTag = '<span class="tag" style="background:#f8d7da;color:#721c24;">مرفوض</span>';
+
+    // لون الحد الجانبي حسب الحالة
+    var borderColor = r.status === 'pending'  ? '#f39c12'
+                    : r.status === 'rejected' ? '#e74c3c'
+                    : 'transparent';
+
+    // أزرار الإجراءات في الأسفل
+    var actions = '';
+    actions += '<button onclick="event.stopPropagation();openDetailModal(' + r.id + ')" '
+             + 'style="flex:1;padding:5px 8px;background:#0d3b6e;color:#fff;border:none;'
+             + 'border-radius:5px;cursor:pointer;font-family:inherit;font-size:.72rem;font-weight:600;">'
+             + '<i class=\"fa fa-eye\"></i> عرض</button>';
+
+    if (ROLE === 'data_entry' || ROLE === 'supervisor' || ROLE === 'manager') {
+      if (r.status !== 'rejected') {
+        actions += '<button onclick="event.stopPropagation();openEditForm(' + r.id + ')" '
+                 + 'style="flex:1;padding:5px 8px;background:#3498db;color:#fff;border:none;'
+                 + 'border-radius:5px;cursor:pointer;font-family:inherit;font-size:.72rem;font-weight:600;">'
+                 + '<i class=\"fa fa-pen\"></i> تعديل</button>';
+      }
+    }
+    if ((ROLE === 'supervisor' || ROLE === 'manager') && r.status === 'pending') {
+      actions += '<button onclick="event.stopPropagation();approveRecord(' + r.id + ',\'approve\')" '
+               + 'style="flex:1;padding:5px 8px;background:#27ae60;color:#fff;border:none;'
+               + 'border-radius:5px;cursor:pointer;font-family:inherit;font-size:.72rem;font-weight:600;">'
+               + '<i class=\"fa fa-check\"></i> موافقة</button>';
+      actions += '<button onclick="event.stopPropagation();approveRecord(' + r.id + ',\'reject\')" '
+               + 'style="flex:1;padding:5px 8px;background:#e74c3c;color:#fff;border:none;'
+               + 'border-radius:5px;cursor:pointer;font-family:inherit;font-size:.72rem;font-weight:600;">'
+               + '<i class=\"fa fa-times\"></i> رفض</button>';
+    }
+
+    return '<div class="rec" onclick="openDetailModal(' + r.id + ')" '
+         + 'style="border-right:3px solid ' + borderColor + ';cursor:pointer;">'
+         + '<div class="rec-top">'
+         + '<span class="rec-code">' + r.code + ' ' + geoTag + ' ' + statusTag + '</span>'
+         + '<span class="rec-gov-badge">' + govName + '</span>'
+         + '</div>'
+         + '<div class="rec-village" style="margin:3px 0;">' + r.village + '</div>'
+         + '<div class="rec-desc">' + (r.description || '—') + '</div>'
+         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">'
+         + '<div class="rec-area"><i class="fa fa-ruler-combined"></i> ' + area + ' م²</div>'
+         + '<div style="display:flex;gap:4px;">' + actions + '</div>'
+         + '</div>'
+         + '</div>';
+  }).join('');
+
+  if (records.length > 300)
+    html += '<div class="loading-msg">… و ' + (records.length - 300) + ' سجل آخر. استخدم الفلترة لتضييق النتائج.</div>';
+
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════
+// MARKERS
+// ══════════════════════════════════════════
+function areaColor(a) {
+  return a > 5000 ? '#e74c3c' : a > 1000 ? '#f39c12' : '#27ae60';
+}
+
+function renderMarkers(records) {
+  ptCluster.clearLayers();
+  // إخفاء السجلات المرفوضة من الخريطة
+  records = records.filter(function(r) { return r.status !== 'rejected'; });
+  records.forEach(function(r) {
+    var col  = areaColor(r.area_total || 0);
+    var icon = L.divIcon({
+      className: '',
+      html: '<div style="width:12px;height:12px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;"></div>',
+      iconSize: [12, 12], iconAnchor: [6, 6]
+    });
+    var m = L.marker([r.latitude, r.longitude], { icon: icon });
+    // IIFE to capture r correctly in closure
+    (function(rec) {
+      m.on('click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        showDetail(rec);
+      });
+    })(r);
+    ptCluster.addLayer(m);
+  });
+}
+
+// ══════════════════════════════════════════
+// DETAIL
+// ══════════════════════════════════════════
+function showDetail(r) {
+  // إذا كان لدينا id نفتح النافذة الكاملة
+  if (r && r.id) {
+    openDetailModal(r.id);
+    map.flyTo([r.latitude, r.longitude], 14, { duration: 0.7 });
+    return;
+  }
+  // fallback: النافذة الجانبية البسيطة
+  function fmt(v) { return Number((v || 0).toFixed(2)).toLocaleString('ar'); }
+  document.getElementById('d-code').textContent  = r.code;
+  document.getElementById('d-total').textContent = fmt(r.area_total) + ' م²';
+  document.getElementById('d-gov').textContent   = r['governorate__name_ar'] || '—';
+  document.getElementById('d-dist').textContent  = r.district_name;
+  document.getElementById('d-vill').textContent  = r.village;
+  document.getElementById('d-occ').textContent   = r.occupant;
+  document.getElementById('d-basin').textContent = r.basin;
+  document.getElementById('d-desc').textContent  = r.description;
+  document.getElementById('d-nile').textContent  = fmt(r.area_nile_bank) + ' م²';
+  document.getElementById('d-pub').textContent   = fmt(r.area_public) + ' م²';
+  document.getElementById('d-geo').textContent   = r.geo_exact ? '✅ دقيق' : '⚠ تقديري';
+  document.getElementById('detail').classList.add('open');
+  map.flyTo([r.latitude, r.longitude], 14, { duration: 0.7 });
+}
+// ══════════════════════════════════════════
+// DETAIL MODAL — نافذة تفاصيل التعدي
+// ══════════════════════════════════════════
+function openDetailModal(id) {
+  if (!id) return;
+  openModal('modal-detail');
+  document.getElementById('detail-modal-body').innerHTML =
+    '<div style="text-align:center;padding:30px;"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>';
+
+  fetch('/api/violations/' + id + '/')
+    .then(function(r) { 
+      if (!r.ok) throw new Error("Server Error");
+      return r.json(); 
+    })
+    .then(function(v) {
+      // تحديث العنوان
+      document.getElementById('detail-modal-title').textContent = 'تعدٍّ: ' + (v.code || id);
+
+      // دالة مساعدة لضمان معالجة الأرقام دون انهيار الكود
+      var formatArea = function(val) {
+        var n = parseFloat(val);
+        return isNaN(n) ? '0.0' : n.toFixed(1);
+      };
+
+      var statusLabels = {pending: 'في الانتظار', approved: 'معتمد', rejected: 'مرفوض'};
+      var statusColors = {pending: '#856404', approved: '#155724', rejected: '#721c24'};
+      var statusBgs    = {pending: '#fff3cd', approved: '#d4edda', rejected: '#f8d7da'};
+
+      var statusBadge = '<span style="background:' + (statusBgs[v.status]||'#eee') + ';color:' +
+        (statusColors[v.status]||'#333') + ';padding:3px 10px;border-radius:10px;font-size:.75rem;font-weight:700;">' +
+        (statusLabels[v.status] || v.status || '—') + '</span>';
+
+      // مصفوفة البيانات مع فحص الأمان لكل حقل
+      var fields = [
+        ['المحافظة',        v.gov_name || '—'],
+        ['المركز',           v.district_name || '—'],
+        ['القرية',           v.village || '—'],
+        ['المستغل',          v.occupant || '—'],
+        ['الحوض',            v.basin || '—'],
+        ['وصف الاستغلال',    v.description || '—'],
+        ['تعدي على الجسر',   formatArea(v.area_nile_bank) + ' م²'],
+        ['تعدي على المنفعة', formatArea(v.area_public) + ' م²'],
+        ['المسطح الإجمالي',
+          '<strong style="color:#e74c3c;font-size:1rem;">' + formatArea(v.area_total) + ' م²</strong>'],
+        ['الحالة',            statusBadge],
+        ['أُدخل بواسطة',      v.submitted_by || '—'],
+        ['تاريخ الإدخال',     v.submitted_at || '—'],
+      ];
+
+      var body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">';
+      for (var fi = 0; fi < fields.length; fi++) {
+        body += '<div style="background:#f8f9fa;border-radius:6px;padding:7px 10px;">';
+        body += '<div style="font-size:.7rem;color:#888;">' + fields[fi][0] + '</div>';
+        body += '<div style="font-size:.83rem;font-weight:600;color:#0d3b6e;">' + fields[fi][1] + '</div>';
+        body += '</div>';
+      }
+      body += '</div>';
+
+      if (v.field_notes) {
+        body += '<div style="background:#fff3cd;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.82rem;">';
+        body += '<strong>ملاحظات ميدانية:</strong> ' + v.field_notes + '</div>';
+      }
+
+      // عرض الصور مع فحص وجودها
+      if (v.images && Array.isArray(v.images) && v.images.length) {
+        body += '<div style="margin-bottom:12px;"><strong style="font-size:.82rem;">الصور المرفقة:</strong>';
+        body += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">';
+        for (var ii = 0; ii < v.images.length; ii++) {
+          body += '<img src="' + v.images[ii].url + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;cursor:pointer;" onclick="window.open(this.src,\'_blank\')">';
+        }
+        body += '</div></div>';
+      }
+
+      body += '<div>';
+      body += '<strong style="font-size:.82rem;">الملاحظات:</strong>';
+      body += '<div id="notes-list" style="margin-top:6px;max-height:120px;overflow-y:auto;"></div>';
+      body += '<div style="display:flex;gap:6px;margin-top:6px;">';
+      body += '<input type="text" id="new-note-text" placeholder="أضف ملاحظة…" style="flex:1;padding:7px 10px;border:1.5px solid #d0d7e3;border-radius:6px;font-family:inherit;font-size:.82rem;">';
+      body += '<button onclick="addNote(' + id + ')" style="padding:7px 12px;background:#0d3b6e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.8rem;">إضافة</button>';
+      body += '</div></div>';
+
+      document.getElementById('detail-modal-body').innerHTML = body;
+      
+      // استدعاء الملاحظات مع حماية ضد الأخطاء
+      if (typeof loadNotes === "function") {
+          try { loadNotes(id); } catch(e) { console.error(e); }
+      }
+
+      // بناء أزرار العمليات
+      var actions = '';
+      if (typeof ROLE !== 'undefined') {
+          if (ROLE === 'data_entry' && v.status === 'pending') {
+            actions += '<button onclick="openEditForm(' + id + ')" style="flex:1;padding:9px;background:#3498db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">';
+            actions += '<i class="fa fa-edit"></i> تعديل</button>';
+          }
+          if ((ROLE === 'supervisor' || ROLE === 'manager') && v.status === 'pending') {
+            actions += '<button onclick="approveRecord(' + id + ', \'approve\')" style="flex:1;padding:9px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">';
+            actions += '<i class="fa fa-check"></i> موافقة</button>';
+            actions += '<button onclick="approveRecord(' + id + ', \'reject\')" style="flex:1;padding:9px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">';
+            actions += '<i class="fa fa-times"></i> رفض</button>';
+          }
+          if (ROLE !== 'viewer') {
+            actions += '<label style="flex:1;padding:9px;background:#8e44ad;color:#fff;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;text-align:center;">';
+            actions += '<i class="fa fa-image"></i> رفع صور';
+            actions += '<input type="file" multiple accept="image/*" style="display:none;" onchange="uploadImages(' + id + ', this)"></label>';
+          }
+      }
+
+      // زر كشف التكرار
+      actions += '<button onclick="checkDuplicates(' + id + ')" '
+              + 'style="flex:1;padding:9px;background:#8e44ad;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">'
+              + '<i class=\"fa fa-clone\"></i> كشف تكرار</button>';
+
+      // زر الطباعة دائماً
+      actions += '<button onclick="printViolation(' + id + ')" '
+              + 'style="flex:1;padding:9px;background:#2c3e50;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">'
+              + '<i class=\"fa fa-print\"></i> طباعة</button>';
+
+      var actionsEl = document.getElementById('detail-modal-actions');
+      if (actionsEl) {
+          actionsEl.style.display = actions ? 'flex' : 'none';
+          actionsEl.innerHTML = actions;
+      }
+
+      if (v.latitude && v.longitude) {
+          map.flyTo([v.latitude, v.longitude], 14, {duration: 0.7});
+      }
+    })
+    .catch(function(err) {
+      console.error(err);
+      document.getElementById('detail-modal-body').innerHTML =
+        '<div style="padding:20px;color:#e74c3c;text-align:center;">حدث خطأ: ' + err.message + '</div>';
+    });
+}
+function closeDetail() { document.getElementById('detail').classList.remove('open'); }
+
+// ══════════════════════════════════════════
+// SUMMARY
+// ══════════════════════════════════════════
+function updateSummary(s) {
+  var fmt = function(n) { return Math.round(n || 0).toLocaleString('ar'); };
+  document.getElementById('res-count').textContent = fmt(s.count);
+  document.getElementById('res-area').textContent  = fmt(s.total_area);
+  document.getElementById('h-area').textContent    = fmt(s.total_area);
+}
+
+// ══════════════════════════════════════════
+// FILTER
+// ══════════════════════════════════════════
+var ftTimer = null;
+function scheduleFilter() { clearTimeout(ftTimer); ftTimer = setTimeout(applyFilter, 450); }
+function applyFilter()    { loadData(buildParams()); }
+function resetFilter() {
+  ['f-gov', 'f-district', 'f-village', 'f-desc'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-search').value = '';
+  document.getElementById('f-area').value   = '';
+  polyGroup.clearLayers();
+  choroGroup.clearLayers();
+  loadData();
+}
+
+// ══════════════════════════════════════════
+// LAYER TOGGLES
+// ══════════════════════════════════════════
+function toggleLayer(name) {
+  var checked = document.getElementById('lyr-' + name).checked;
+  var layers  = { poly: polyGroup, choro: choroGroup, pts: ptCluster };
+  if (checked) map.addLayer(layers[name]);
+  else         map.removeLayer(layers[name]);
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+var totalArea = parseFloat("{{ overall.total_area|default:0 }}") || 0;
+document.getElementById('h-area').textContent = Math.round(totalArea).toLocaleString('ar');
+loadGovsPanel();
+loadData();
+loadRejectedCount();
+
+// ══════════════════════════════════════════
+// PENDING NOTIFICATIONS — تحديث كل 30 ثانية
+// ══════════════════════════════════════════
+var lastPendingCount = 0;
+var notifPermission  = false;
+
+// طلب إذن الإشعارات من المتصفح
+if (ROLE === 'supervisor' || ROLE === 'manager') {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(function(perm) {
+      notifPermission = perm === 'granted';
+    });
+  } else if (Notification.permission === 'granted') {
+    notifPermission = true;
+  }
+}
+
+function checkPendingCount() {
+  if (ROLE !== 'supervisor' && ROLE !== 'manager') return;
+
+  fetch('/api/violations/pending/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var count = data.count || 0;
+      var badge = document.getElementById('pending-badge');
+      var btn   = document.getElementById('btn-pending');
+
+      if (!badge) return;
+
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline';
+        btn.style.animation = count !== lastPendingCount ? 'pulse 0.5s ease 3' : '';
+      } else {
+        badge.style.display = 'none';
+        btn.style.animation = '';
+      }
+
+      // إشعار جديد فقط إذا زاد العدد
+      if (count > lastPendingCount && lastPendingCount >= 0) {
+        var newCount = count - lastPendingCount;
+
+        // إشعار في الصفحة
+        showToast(
+          'يوجد ' + count + ' تعدٍّ في انتظار موافقتك',
+          'warning'
+        );
+
+        // إشعار المتصفح (خارج الصفحة)
+        if (notifPermission && document.hidden) {
+          new Notification('منظومة توثيق أراضي طرح النهر', {
+            body: 'يوجد ' + newCount + ' تعدٍّ جديد في انتظار مراجعتك',
+            icon: '/static/violations/libs/leaflet/images/marker-icon.png',
+            tag: 'pending-violation',
+          });
+        }
+
+        // تحديث عنوان الصفحة
+        document.title = '(' + count + ') منظومة توثيق أراضي طرح النهر';
+      } else if (count === 0 && lastPendingCount > 0) {
+        // تمت مراجعة كل شيء
+        document.title = 'منظومة توثيق أراضي طرح النهر';
+      }
+
+      lastPendingCount = count;
+    })
+    .catch(function() {}); // تجاهل أخطاء الشبكة
+}
+
+// تشغيل أول فحص فوراً ثم كل 30 ثانية
+if (ROLE === 'supervisor' || ROLE === 'manager') {
+  checkPendingCount();
+  setInterval(checkPendingCount, 30000);
+}
+
+
+
+function getCsrfToken() {
+  // Method 1: from cookie
+  var match = document.cookie.match(/csrftoken=([^;]+)/);
+  if (match) return decodeURIComponent(match[1]);
+  // Method 2: from hidden form input
+  var input = document.querySelector('#csrf-form input[name="csrfmiddlewaretoken"]');
+  if (input) return input.value;
+  return '';
+}
+
+
+
+// ══════════════════════════════════════════
+// ROLE FROM DJANGO — already defined above
+// ══════════════════════════════════════════
+
+// ══════════════════════════════════════════
+// ADD FORM
+// ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// STEPPER STATE
+// ══════════════════════════════════════════
+var currentStep   = 1;
+var totalSteps    = 4;
+var villageGeoData = {};  // pcode -> center coords
+
+function openAddForm() {
+  document.getElementById('form-title').textContent = 'إضافة تعدٍّ جديد';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('fm-village-pcode').value = '';
+
+  // Reset all fields
+  var textFields = ['fm-occupant','fm-basin','fm-description','fm-notes'];
+  textFields.forEach(function(id) { document.getElementById(id).value = ''; });
+
+  var numFields = ['fm-nile','fm-public','fm-outside','fm-total','fm-lat','fm-lon'];
+  numFields.forEach(function(id) { document.getElementById(id).value = ''; });
+
+  document.getElementById('fm-total-display').textContent = '0.00';
+  document.getElementById('fm-gov').value = '';
+  document.getElementById('fm-district').value = '';
+  document.getElementById('fm-district').disabled = true;
+  document.getElementById('fm-district').innerHTML = '<option value="">— اختر المحافظة أولاً —</option>';
+  document.getElementById('fm-village-select').value = '';
+  document.getElementById('fm-village-select').disabled = true;
+  document.getElementById('fm-village-select').innerHTML = '<option value="">— اختر المركز أولاً —</option>';
+  document.getElementById('fm-village').value = '';
+  document.getElementById('fm-village-custom-wrap').style.display = 'none';
+  document.getElementById('hint-district').textContent = 'اختر المحافظة أولاً لتفعيل هذه القائمة';
+  document.getElementById('hint-village').textContent  = 'اختر المركز أولاً لتفعيل هذه القائمة';
+
+  if (pickMarker) { map.removeLayer(pickMarker); pickMarker = null; }
+  goStep(1);
+  openModal('modal-form');
+}
+
+// ── STEP NAVIGATION ───────────────────────────────────
+function goStep(n) {
+  // Validate before going forward
+  if (n > currentStep && !validateStep(currentStep)) return;
+
+  currentStep = n;
+
+  // Show/hide steps
+  for (var i = 1; i <= totalSteps; i++) {
+    var stepEl = document.getElementById('step-' + i);
+    if (stepEl) stepEl.style.display = i === n ? 'block' : 'none';
+
+    var fstep = document.getElementById('fstep-' + i);
+    if (fstep) {
+      fstep.className = 'fstep';
+      if (i < n)  fstep.className += ' done';
+      if (i === n) fstep.className += ' active';
+    }
+  }
+
+  // Update footer buttons
+  document.getElementById('btn-prev').style.display = n > 1 ? 'inline-block' : 'none';
+  document.getElementById('btn-next').style.display = n < totalSteps ? 'inline-block' : 'none';
+  document.getElementById('btn-save').style.display = n === totalSteps ? 'inline-block' : 'none';
+  document.getElementById('step-indicator').textContent = 'الخطوة ' + n + ' من ' + totalSteps;
+
+  // Special actions per step
+  if (n === 4) buildSummary();
+}
+
+function nextStep() { goStep(currentStep + 1); }
+function prevStep() { goStep(currentStep - 1); }
+
+function validateStep(n) {
+  if (n === 1) {
+    var gov  = document.getElementById('fm-gov').value;
+    var dist = document.getElementById('fm-district').value;
+    var vill = document.getElementById('fm-village-select').value ||
+               document.getElementById('fm-village').value.trim();
+    if (!gov)  { showToast('اختر المحافظة', 'error'); return false; }
+    if (!dist) { showToast('اختر المركز الإداري', 'error'); return false; }
+    if (!vill) { showToast('اختر القرية أو أدخل اسمها', 'error'); return false; }
+  }
+  if (n === 2) {
+    if (!document.getElementById('fm-occupant').value.trim())   { showToast('أدخل اسم المستغل', 'error'); return false; }
+    if (!document.getElementById('fm-basin').value.trim())      { showToast('أدخل اسم الحوض', 'error'); return false; }
+    if (!document.getElementById('fm-description').value.trim()){ showToast('أدخل وصف الاستغلال', 'error'); return false; }
+  }
+  if (n === 3) {
+    var total = parseFloat(document.getElementById('fm-total').value) || 0;
+    if (total <= 0) { showToast('أدخل مساحة التعدي', 'error'); return false; }
+  }
+  return true;
+}
+
+// ── PROGRESSIVE GOV/DISTRICT/VILLAGE ─────────────────
+function onFormGovChange() {
+  var gov = document.getElementById('fm-gov').value;
+  var distSel = document.getElementById('fm-district');
+  var villSel = document.getElementById('fm-village-select');
+
+  // Reset downstream
+  distSel.innerHTML  = '<option value="">— جاري التحميل —</option>';
+  distSel.disabled   = true;
+  villSel.innerHTML  = '<option value="">— اختر المركز أولاً —</option>';
+  villSel.disabled   = true;
+  document.getElementById('fm-village').value = '';
+  document.getElementById('fm-village-pcode').value = '';
+  document.getElementById('fm-lat').value = '';
+  document.getElementById('fm-lon').value = '';
+
+  if (!gov) {
+    distSel.innerHTML = '<option value="">— اختر المحافظة أولاً —</option>';
+    document.getElementById('hint-district').textContent = 'اختر المحافظة أولاً';
+    return;
+  }
+
+  fetch('/api/filter-options/?gov=' + gov)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      distSel.innerHTML = '<option value="">— اختر المركز —</option>';
+      (d.districts || []).forEach(function(dist) {
+        var opt = document.createElement('option');
+        opt.value = dist; opt.textContent = dist;
+        distSel.appendChild(opt);
+      });
+      distSel.disabled = false;
+      document.getElementById('hint-district').textContent = 'اختر المركز الإداري';
+    });
+}
+
+function onFormDistrictChange() {
+  var gov  = document.getElementById('fm-gov').value;
+  var dist = document.getElementById('fm-district').value;
+  var villSel = document.getElementById('fm-village-select');
+
+  villSel.innerHTML = '<option value="">— جاري التحميل —</option>';
+  villSel.disabled  = true;
+  document.getElementById('fm-village').value = '';
+  document.getElementById('fm-village-pcode').value = '';
+  document.getElementById('fm-lat').value = '';
+  document.getElementById('fm-lon').value = '';
+
+  if (!dist) {
+    villSel.innerHTML = '<option value="">— اختر المركز أولاً —</option>';
+    return;
+  }
+
+  fetch('/api/filter-options/?gov=' + gov + '&district=' + encodeURIComponent(dist))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      villSel.innerHTML = '<option value="">— اختر القرية —</option>';
+      (d.villages || []).forEach(function(vill) {
+        var opt = document.createElement('option');
+        opt.value = vill; opt.textContent = vill;
+        villSel.appendChild(opt);
+      });
+      // Add "other" option
+      var other = document.createElement('option');
+      other.value = '__other__'; other.textContent = '— أخرى (أدخل يدوياً) —';
+      villSel.appendChild(other);
+      villSel.disabled = false;
+      document.getElementById('hint-village').textContent = 'اختر القرية';
+    });
+}
+
+function onFormVillageChange() {
+  var govPcode = document.getElementById('fm-gov').value;
+  var selected = document.getElementById('fm-village-select').value;
+
+  if (selected === '__other__') {
+    document.getElementById('fm-village-custom-wrap').style.display = 'block';
+    document.getElementById('fm-village').focus();
+    document.getElementById('fm-village-pcode').value = '';
+    document.getElementById('fm-lat').value = '';
+    document.getElementById('fm-lon').value = '';
+    updateLocationStatus(false, 'يُرجى تحديد الموقع يدوياً بالنقر على الخريطة');
+    return;
+  }
+
+  document.getElementById('fm-village-custom-wrap').style.display = 'none';
+  document.getElementById('fm-village').value = selected;
+
+  if (!selected) return;
+
+  // Find village coordinates from geo data
+  fetch('/api/geo/' + govPcode + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var polys = data.polygons || [];
+      var found = null;
+      for (var i = 0; i < polys.length; i++) {
+        if (polys[i].name_ar === selected) { found = polys[i]; break; }
+      }
+      if (found && found.center) {
+        var lat = found.center[0];
+        var lon = found.center[1];
+        document.getElementById('fm-lat').value = lat.toFixed(6);
+        document.getElementById('fm-lon').value = lon.toFixed(6);
+        document.getElementById('fm-village-pcode').value = found.pcode || '';
+
+        // Fly map to village
+        map.flyTo([lat, lon], 13, {duration: 1});
+        if (pickMarker) map.removeLayer(pickMarker);
+        pickMarker = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className:'',
+            html:'<div style="width:16px;height:16px;border-radius:50%;background:#27ae60;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
+            iconSize:[16,16], iconAnchor:[8,8]
+          })
+        }).addTo(map).bindPopup(selected).openPopup();
+
+        updateLocationStatus(true, 'تم تحديد الموقع تلقائياً من مركز القرية: ' + selected);
+      } else {
+        updateLocationStatus(false, 'لم يُعثر على إحداثيات القرية — يُرجى التحديد يدوياً');
+      }
+    });
+}
+
+function updateLocationStatus(ok, msg) {
+  var el = document.getElementById('location-status');
+  var txtEl = document.getElementById('location-status-text');
+  if (ok) {
+    el.style.background = '#d4edda'; el.style.color = '#155724';
+    el.style.borderColor = '#c3e6cb';
+    el.innerHTML = '<i class="fa fa-check-circle"></i> ' + msg;
+  } else {
+    el.style.background = '#fff3cd'; el.style.color = '#856404';
+    el.style.borderColor = '#ffeeba';
+    el.innerHTML = '<i class="fa fa-exclamation-triangle"></i> ' + msg;
+  }
+}
+
+// ── CALC TOTAL ────────────────────────────────────────
+function calcTotal() {
+  var n = parseFloat(document.getElementById('fm-nile').value)   || 0;
+  var p = parseFloat(document.getElementById('fm-public').value)  || 0;
+  var o = parseFloat(document.getElementById('fm-outside').value) || 0;
+  var t = n + p + o;
+  document.getElementById('fm-total').value        = t.toFixed(2);
+  document.getElementById('fm-total-display').textContent = t.toFixed(2);
+}
+
+// ── PICK FROM MAP ─────────────────────────────────────
+function pickFromMap() {
+  closeAllModals();
+  pickingLocation = true;
+  map.getContainer().style.cursor = 'crosshair';
+  showToast('انقر على الخريطة لتحديد موقع التعدي بدقة', 'info');
+}
+
+map.on('click', function(e) {
+  if (!pickingLocation) return;
+  pickingLocation = false;
+  map.getContainer().style.cursor = '';
+  var lat = e.latlng.lat.toFixed(6);
+  var lon = e.latlng.lng.toFixed(6);
+  document.getElementById('fm-lat').value = lat;
+  document.getElementById('fm-lon').value = lon;
+  if (pickMarker) map.removeLayer(pickMarker);
+  pickMarker = L.marker(e.latlng, {
+    icon: L.divIcon({
+      className:'',
+      html:'<div style="width:16px;height:16px;border-radius:50%;background:#e74c3c;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>',
+      iconSize:[16,16], iconAnchor:[8,8]
+    })
+  }).addTo(map).bindPopup('موقع التعدي').openPopup();
+  updateLocationStatus(true, 'تم تحديد الموقع يدوياً بالنقر على الخريطة');
+  openModal('modal-form');
+  goStep(4);
+  showToast('تم تحديد الموقع ✓', 'success');
+});
+
+// ── SUMMARY ───────────────────────────────────────────
+function buildSummary() {
+  var gov    = document.getElementById('fm-gov').options[document.getElementById('fm-gov').selectedIndex];
+  var vill   = document.getElementById('fm-village-select').value !== '__other__'
+               ? document.getElementById('fm-village-select').value
+               : document.getElementById('fm-village').value;
+  var total  = document.getElementById('fm-total-display').textContent;
+  var lat    = document.getElementById('fm-lat').value;
+  var lon    = document.getElementById('fm-lon').value;
+
+  var rows = [
+    ['المحافظة',    gov ? gov.textContent : '—'],
+    ['المركز',      document.getElementById('fm-district').value || '—'],
+    ['القرية',      vill || '—'],
+    ['المستغل',     document.getElementById('fm-occupant').value || '—'],
+    ['وصف الاستغلال', document.getElementById('fm-description').value || '—'],
+    ['المسطح الإجمالي', total + ' م²'],
+    ['الإحداثيات', lat && lon ? lat + ' , ' + lon : 'غير محدد'],
+  ];
+
+  var html = '';
+  rows.forEach(function(r) {
+    html += '<div style="display:flex;justify-content:space-between;padding:5px 0;' +
+      'border-bottom:1px solid #eee;font-size:.8rem;">' +
+      '<span style="color:#666;">' + r[0] + '</span>' +
+      '<span style="font-weight:600;color:#0d3b6e;text-align:left;max-width:60%;">' + r[1] + '</span>' +
+      '</div>';
+  });
+  document.getElementById('form-summary').innerHTML = html;
+}
+
+// ── SAVE ──────────────────────────────────────────────
+function saveViolation() {
+  if (!validateStep(4)) return;
+
+  var lat = parseFloat(document.getElementById('fm-lat').value);
+  var lon = parseFloat(document.getElementById('fm-lon').value);
+  if (!lat || !lon) {
+    showToast('يُرجى تحديد الموقع الجغرافي', 'error'); return;
+  }
+
+  var vill = document.getElementById('fm-village-select').value !== '__other__'
+             ? document.getElementById('fm-village-select').value
+             : document.getElementById('fm-village').value.trim();
+
+  var editId = document.getElementById('edit-id').value;
+  var url    = editId ? '/api/violations/' + editId + '/edit/' : '/api/violations/add/';
+
+  var data = {
+    gov_pcode:     document.getElementById('fm-gov').value,
+    district_name: document.getElementById('fm-district').value,
+    village:       vill,
+    village_pcode: document.getElementById('fm-village-pcode').value,
+    occupant:      document.getElementById('fm-occupant').value.trim(),
+    basin:         document.getElementById('fm-basin').value.trim(),
+    description:   document.getElementById('fm-description').value.trim(),
+    area_nile_bank:parseFloat(document.getElementById('fm-nile').value)    || 0,
+    area_public:   parseFloat(document.getElementById('fm-public').value)   || 0,
+    area_outside:  parseFloat(document.getElementById('fm-outside').value)  || 0,
+    area_total:    parseFloat(document.getElementById('fm-total').value)    || 0,
+    latitude:      lat,
+    longitude:     lon,
+    geo_exact:     !!document.getElementById('fm-village-pcode').value,
+    field_notes:   document.getElementById('fm-notes').value,
+  };
+
+  var saveBtn = document.getElementById('btn-save');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> جاري الحفظ…';
+
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa fa-save"></i> حفظ';
+    if (res.success) {
+      closeAllModals();
+      showToast(res.message + ' — الرمز: ' + res.code, 'success');
+      if (pickMarker) { map.removeLayer(pickMarker); pickMarker = null; }
+      loadData(buildParams());
+    } else {
+      showToast(res.error || 'حدث خطأ', 'error');
+    }
+  })
+  .catch(function() {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa fa-save"></i> حفظ';
+    showToast('خطأ في الاتصال بالخادم', 'error');
+  });
+}
+
+// ── EDIT FORM ─────────────────────────────────────────
+function openEditForm(id) {
+  fetch('/api/violations/' + id + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(v) {
+      closeAllModals();
+      document.getElementById('form-title').textContent = 'تعديل سجل: ' + v.code;
+      document.getElementById('edit-id').value = id;
+
+      // Set gov
+      document.getElementById('fm-gov').value = v.gov_pcode;
+      onFormGovChange();
+
+      // After districts load, set district then village
+      setTimeout(function() {
+        document.getElementById('fm-district').value = v.district_name;
+        onFormDistrictChange();
+        setTimeout(function() {
+          document.getElementById('fm-village-select').value = v.village;
+          if (!document.getElementById('fm-village-select').value) {
+            var opt = document.createElement('option');
+            opt.value = v.village; opt.textContent = v.village;
+            document.getElementById('fm-village-select').appendChild(opt);
+            document.getElementById('fm-village-select').value = v.village;
+          }
+          document.getElementById('fm-village').value = v.village;
+          document.getElementById('fm-village-pcode').value = v.village_pcode || '';
+          document.getElementById('fm-lat').value = v.latitude;
+          document.getElementById('fm-lon').value = v.longitude;
+          updateLocationStatus(!!v.geo_exact, v.geo_exact ? 'إحداثيات دقيقة من الشيب فايل' : 'إحداثيات تقديرية');
+          if (v.latitude && v.longitude) {
+            map.flyTo([v.latitude, v.longitude], 13);
+          }
+        }, 800);
+      }, 600);
+
+      // Set other fields
+      document.getElementById('fm-occupant').value    = v.occupant;
+      document.getElementById('fm-basin').value       = v.basin;
+      document.getElementById('fm-description').value = v.description;
+      document.getElementById('fm-notes').value       = v.field_notes || '';
+      document.getElementById('fm-nile').value        = v.area_nile_bank || '';
+      document.getElementById('fm-public').value      = v.area_public || '';
+      document.getElementById('fm-outside').value     = v.area_outside || '';
+      document.getElementById('fm-total').value       = v.area_total || '';
+      document.getElementById('fm-total-display').textContent = (v.area_total || 0).toFixed(2);
+
+      goStep(1);
+      openModal('modal-form');
+    });
+}
+
+// ══════════════════════════════════════════
+// PENDING LIST
+// ══════════════════════════════════════════
+function openPendingList() {
+  openModal('modal-pending');
+  var el = document.getElementById('pending-list');
+  el.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>';
+
+  fetch('/api/violations/pending/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.records || !data.records.length) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">' +
+          '<i class="fa fa-check-circle" style="font-size:2rem;color:#27ae60;"></i>' +
+          '<br><br>لا توجد سجلات في انتظار الموافقة</div>';
+        return;
+      }
+      el.innerHTML = data.records.map(function(r) {
+        var date = r.submitted_at ? new Date(r.submitted_at).toLocaleDateString('ar') : '—';
+        var submitter = r.submitted_by__first_name || r.submitted_by__username || '—';
+        return '<div style="border:1.5px solid #ffeeba;border-radius:8px;padding:12px;margin-bottom:8px;background:#fffef5;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:start;">' +
+          '<div>' +
+          '<div style="font-weight:700;color:#0d3b6e;font-size:.88rem;">' + (r.governorate__name_ar||'—') + ' — ' + r.district_name + ' — ' + r.village + '</div>' +
+          '<div style="font-size:.78rem;color:#666;margin-top:3px;">' + r.occupant + ' | ' + r.description + '</div>' +
+          '<div style="font-size:.73rem;color:#888;margin-top:3px;">أدخله: ' + submitter + ' | ' + date + '</div>' +
+          '</div>' +
+          '<div style="font-size:.88rem;font-weight:700;color:#e74c3c;">' + Math.round(r.area_total||0).toLocaleString('ar') + ' م²</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;margin-top:10px;">' +
+          '<button onclick="openDetailModal(' + r.id + ')" style="flex:1;padding:7px;background:#3498db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;"><i class="fa fa-eye"></i> عرض</button>' +
+          '<button onclick="approveRecord(' + r.id + ',\'approve\')" style="flex:1;padding:7px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;"><i class=\'fa fa-check\'></i> موافقة</button>' +
+          '<button onclick="approveRecord(' + r.id + ',\'reject\')" style="flex:1;padding:7px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;"><i class=\'fa fa-times\'></i> رفض</button>' +
+          '</div></div>';
+      }).join('');
+    })
+    .catch(function() {
+      el.innerHTML = '<div style="padding:20px;color:#e74c3c;text-align:center;">حدث خطأ أثناء التحميل</div>';
+    });
+}
+
+function approveRecord(id, action) {
+  var notes = action === 'reject' ? (prompt('سبب الرفض (اختياري):') || '') : '';
+  fetch('/api/violations/' + id + '/approve/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({action: action, notes: notes})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) {
+      showToast(res.message, action === 'approve' ? 'success' : 'error');
+      openPendingList();
+      loadData(buildParams());
+    } else {
+      showToast(res.error || 'حدث خطأ', 'error');
+    }
+  });
+}
+
+function loadNotes(id) {
+  fetch('/api/violations/' + id + '/notes/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('notes-list');
+      if (!el) return;
+      if (!data.notes || !data.notes.length) {
+        el.innerHTML = '<div style="color:#aaa;font-size:.78rem;padding:4px 0;">لا توجد ملاحظات بعد</div>';
+        return;
+      }
+      el.innerHTML = data.notes.map(function(n) {
+        var date = n.created_at ? new Date(n.created_at).toLocaleDateString('ar') : '';
+        return '<div style="background:#f8f9fa;border-radius:6px;padding:8px 10px;margin-bottom:6px;">' +
+          '<div style="font-size:.82rem;">' + n.text + '</div>' +
+          '<div style="font-size:.72rem;color:#888;margin-top:4px;">' + (n.user__first_name||n.user__username||'—') + ' • ' + date + '</div>' +
+          '</div>';
+      }).join('');
+    })
+    .catch(function() {});
+}
+
+function addNote(id) {
+  var input = document.getElementById('new-note-text');
+  var text  = input ? input.value.trim() : '';
+  if (!text) return;
+  fetch('/api/violations/' + id + '/notes/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({text: text})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) {
+      if (input) input.value = '';
+      loadNotes(id);
+    } else {
+      showToast(res.error || 'حدث خطأ', 'error');
+    }
+  });
+}
+
+function uploadImages(id, input) {
+  var formData = new FormData();
+  Array.from(input.files).forEach(function(f) { formData.append('images', f); });
+  formData.append('csrfmiddlewaretoken', getCsrfToken());
+  fetch('/api/violations/' + id + '/images/', {method:'POST', body:formData})
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.success) {
+        showToast('تم رفع ' + res.images.length + ' صورة', 'success');
+        openDetailModal(id);
+      } else {
+        showToast(res.error || 'حدث خطأ', 'error');
+      }
+    });
+}
+
+function showToast(msg, type) {
+  var colors = {success:'#27ae60', error:'#e74c3c', info:'#3498db', warning:'#f39c12'};
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);' +
+    'background:' + (colors[type]||'#333') + ';color:#fff;padding:12px 24px;border-radius:8px;' +
+    'font-family:inherit;font-size:.88rem;font-weight:600;z-index:9999;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.25);';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() {
+    t.style.transition = 'opacity .3s';
+    t.style.opacity = '0';
+    setTimeout(function() { t.remove(); }, 300);
+  }, 3000);
+}
+
+
+// ══════════════════════════════════════════
+// REJECTED VIOLATIONS
+// ══════════════════════════════════════════
+function openRejectedList() {
+  var overlay = document.getElementById('modal-overlay');
+  var modal   = document.getElementById('modal-rejected');
+  if (overlay) overlay.style.display = 'block';
+  if (modal)   modal.style.display   = 'flex';
+
+  var el = document.getElementById('rejected-list');
+  el.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fa fa-spinner fa-spin"></i> جاري التحميل…</div>';
+
+  fetch('/api/violations/rejected/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.records || !data.records.length) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:#888;">' +
+          '<i class="fa fa-check-circle" style="font-size:2rem;color:#27ae60;"></i>' +
+          '<br><br>لا توجد تعديات مرفوضة</div>';
+        return;
+      }
+
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">' +
+        '<thead><tr style="background:#f8f9fa;">' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;white-space:nowrap;">الرمز</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">المحافظة</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">القرية</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">المستغل</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">المساحة م²</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">سبب الرفض</th>' +
+        '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #eee;">إجراء</th>' +
+        '</tr></thead><tbody>';
+
+      data.records.forEach(function(r) {
+        var reviewer = r.reviewed_by__first_name || r.reviewed_by__username || '—';
+        var date = r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString('ar') : '—';
+        html += '<tr style="border-bottom:1px solid #f5f5f5;">' +
+          '<td style="padding:8px 12px;font-weight:700;color:#0d3b6e;">' + r.code + '</td>' +
+          '<td style="padding:8px 12px;">' + (r.governorate__name_ar||'—') + '</td>' +
+          '<td style="padding:8px 12px;">' + r.village + '</td>' +
+          '<td style="padding:8px 12px;">' + r.occupant + '</td>' +
+          '<td style="padding:8px 12px;font-weight:700;color:#e74c3c;">' + Math.round(r.area_total||0).toLocaleString('ar') + '</td>' +
+          '<td style="padding:8px 12px;color:#856404;font-size:.75rem;">' + (r.review_notes||'—') + '</td>' +
+          '<td style="padding:8px 12px;">' +
+          '<button onclick="restoreViolation(' + r.id + ')" ' +
+          'style="padding:5px 10px;background:#f39c12;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;">' +
+          '<i class="fa fa-rotate-left"></i> إعادة للانتظار</button>' +
+          '</td></tr>';
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+
+      // Update badge
+      var badge = document.getElementById('rejected-badge');
+      if (badge) {
+        badge.textContent = data.count;
+        badge.style.display = data.count > 0 ? 'inline' : 'none';
+      }
+    });
+}
+
+function restoreViolation(id) {
+  if (!confirm('إعادة هذا السجل إلى قائمة الانتظار للمراجعة؟')) return;
+  fetch('/api/violations/' + id + '/restore/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    if (res.success) {
+      showToast(res.message, 'success');
+      openRejectedList();
+      loadData(buildParams());
+    } else {
+      showToast(res.error || 'حدث خطأ', 'error');
+    }
+  });
+}
+
+// تحديث عداد المرفوضات عند فتح الصفحة
+function loadRejectedCount() {
+  if (ROLE !== 'supervisor' && ROLE !== 'manager') return;
+  fetch('/api/violations/rejected/')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var badge = document.getElementById('rejected-badge');
+      if (badge && data.count > 0) {
+        badge.textContent = data.count;
+        badge.style.display = 'inline';
+      }
+    }).catch(function(){});
+}
+
+
+// ══════════════════════════════════════════
+// PRINT VIOLATION
+// ══════════════════════════════════════════
+function printViolation(id) {
+  fetch('/api/violations/' + id + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(v) {
+
+      var statusLabels = {pending: 'في الانتظار', approved: 'معتمد', rejected: 'مرفوض'};
+      var statusColors = {pending: '#856404', approved: '#155724', rejected: '#721c24'};
+      var statusBgs    = {pending: '#fff3cd', approved: '#d4edda', rejected: '#f8d7da'};
+      var fmt = function(n) { return Number(parseFloat(n||0).toFixed(2)).toLocaleString('ar'); };
+      var today = new Date().toLocaleDateString('ar-EG', {year:'numeric',month:'long',day:'numeric'});
+
+      var html = '<!DOCTYPE html><html lang="ar" dir="rtl">'
+        + '<head><meta charset="UTF-8">'
+        + '<title>بيانات التعدي — ' + v.code + '</title>'
+        + '<style>'
+        + '* { margin:0; padding:0; box-sizing:border-box; }'
+        + 'body { font-family: "Arial", sans-serif; font-size: 12pt; color: #000; direction: rtl; }'
+        + '.page { max-width: 210mm; margin: 0 auto; padding: 15mm; }'
+
+        // Header
+        + '.header { text-align: center; border-bottom: 3px solid #0d3b6e; padding-bottom: 12px; margin-bottom: 16px; }'
+        + '.header h1 { font-size: 14pt; color: #0d3b6e; margin-bottom: 4px; }'
+        + '.header h2 { font-size: 11pt; color: #555; font-weight: normal; }'
+        + '.header .meta { font-size: 9pt; color: #777; margin-top: 6px; }'
+
+        // Code badge
+        + '.code-badge { display: inline-block; background: #0d3b6e; color: #fff; '
+        + '  padding: 4px 16px; border-radius: 20px; font-size: 11pt; font-weight: bold; margin-bottom: 16px; }'
+
+        // Status
+        + '.status-badge { display: inline-block; padding: 3px 12px; border-radius: 10px; font-size: 10pt; font-weight: bold; margin-right: 8px; }'
+
+        // Table
+        + '.info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }'
+        + '.info-table th { background: #0d3b6e; color: #fff; padding: 8px 12px; text-align: right; font-size: 10pt; width: 35%; }'
+        + '.info-table td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-size: 10pt; }'
+        + '.info-table tr:nth-child(even) td { background: #f8f9fa; }'
+
+        // Areas table
+        + '.section-title { background: #1a6ea8; color: #fff; padding: 6px 12px; '
+        + '  font-size: 10pt; font-weight: bold; margin: 16px 0 0; }'
+        + '.area-table { width: 100%; border-collapse: collapse; }'
+        + '.area-table th { background: #e8f0f8; color: #0d3b6e; padding: 7px 12px; text-align: center; font-size: 10pt; border: 1px solid #c5d8f0; }'
+        + '.area-table td { padding: 7px 12px; border: 1px solid #e0e0e0; text-align: center; font-size: 10pt; }'
+        + '.area-total { background: #fff3cd; font-weight: bold; font-size: 11pt; color: #c0392b; }'
+
+        // Notes
+        + '.notes-box { background: #fffbf0; border: 1px solid #f39c12; border-radius: 6px; '
+        + '  padding: 10px 14px; margin-top: 16px; font-size: 10pt; line-height: 1.7; }'
+
+        // Footer
+        + '.footer { border-top: 2px solid #0d3b6e; margin-top: 20px; padding-top: 10px; '
+        + '  display: flex; justify-content: space-between; font-size: 9pt; color: #777; }'
+        + '.signature-box { border: 1px solid #ccc; padding: 8px 20px; text-align: center; '
+        + '  font-size: 9pt; min-width: 120px; }'
+        + '@media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }'
+        + '</style></head><body><div class="page">'
+
+        // === HEADER ===
+        + '<div class="header">'
+        + '<h1>جمهورية مصر العربية — وزارة الموارد المائية والري</h1>'
+        + '<h2>منظومة توثيق أراضي طرح النهر</h2>'
+        + '<div class="meta">بيان توثيق تعدٍّ على أراضي طرح النهر &nbsp;|&nbsp; تاريخ الطباعة: ' + today + '</div>'
+        + '</div>'
+
+        // === CODE & STATUS ===
+        + '<div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;">'
+        + '<span class="code-badge">' + (v.code || '—') + '</span>'
+        + '<span class="status-badge" style="background:' + (statusBgs[v.status]||'#eee') + ';color:' + (statusColors[v.status]||'#333') + ';">'
+        + (statusLabels[v.status] || v.status) + '</span>'
+        + (v.geo_exact ? '<span style="font-size:9pt;color:#27ae60;"><i>✓ إحداثيات دقيقة</i></span>'
+                       : '<span style="font-size:9pt;color:#e67e22;"><i>⚠ إحداثيات تقديرية</i></span>')
+        + '</div>'
+
+        // === LOCATION INFO ===
+        + '<div class="section-title">أولاً: بيانات الموقع الإداري</div>'
+        + '<table class="info-table">'
+        + '<tr><th>المحافظة</th><td>' + (v.gov_name || '—') + '</td></tr>'
+        + '<tr><th>المركز الإداري</th><td>' + (v.district_name || '—') + '</td></tr>'
+        + '<tr><th>القرية / المدينة</th><td>' + (v.village || '—') + '</td></tr>'
+        + '<tr><th>اسم الحوض</th><td>' + (v.basin || '—') + '</td></tr>'
+        + '<tr><th>الإحداثيات</th><td>خط العرض: ' + (v.latitude||'—') + ' &nbsp;|&nbsp; خط الطول: ' + (v.longitude||'—') + '</td></tr>'
+        + '</table>'
+
+        // === VIOLATION INFO ===
+        + '<div class="section-title">ثانياً: بيانات التعدي</div>'
+        + '<table class="info-table">'
+        + '<tr><th>اسم المستغل</th><td>' + (v.occupant || '—') + '</td></tr>'
+        + '<tr><th>وصف الاستغلال</th><td>' + (v.description || '—') + '</td></tr>'
+        + '</table>'
+
+        // === AREAS ===
+        + '<div class="section-title">ثالثاً: المساحات (م²)</div>'
+        + '<table class="area-table">'
+        + '<tr>'
+        + '<th>تعدي على جسر نهر النيل</th>'
+        + '<th>تعدي على المنفعة العامة</th>'
+        + '<th>المسطح خارج الحياض</th>'
+        + '<th class="area-total">المسطح الإجمالي</th>'
+        + '</tr><tr>'
+        + '<td>' + fmt(v.area_nile_bank) + '</td>'
+        + '<td>' + fmt(v.area_public) + '</td>'
+        + '<td>' + fmt(v.area_outside) + '</td>'
+        + '<td class="area-total">' + fmt(v.area_total) + '</td>'
+        + '</tr></table>';
+
+      // === FIELD NOTES ===
+      if (v.field_notes) {
+        html += '<div class="notes-box"><strong>ملاحظات ميدانية:</strong><br>' + v.field_notes + '</div>';
+      }
+
+      // === AUDIT INFO ===
+      html += '<div class="section-title">رابعاً: بيانات التوثيق</div>'
+        + '<table class="info-table">'
+        + '<tr><th>أُدخل بواسطة</th><td>' + (v.submitted_by || '—') + '</td></tr>'
+        + '<tr><th>تاريخ الإدخال</th><td>' + (v.submitted_at || '—') + '</td></tr>'
+        + (v.review_notes ? '<tr><th>ملاحظات المراجعة</th><td>' + v.review_notes + '</td></tr>' : '')
+        + '</table>'
+
+        // === SIGNATURES ===
+        + '<div class="footer">'
+        + '<div>'
+        + '<div class="signature-box">توقيع مدخل البيانات<br><br><br>_______________</div>'
+        + '</div>'
+        + '<div style="text-align:center;font-size:9pt;color:#999;">'
+        + 'منظومة توثيق أراضي طرح النهر<br>'
+        + 'وزارة الموارد المائية والري<br>'
+        + 'جمهورية مصر العربية'
+        + '</div>'
+        + '<div>'
+        + '<div class="signature-box">توقيع المشرف المختص<br><br><br>_______________</div>'
+        + '</div>'
+        + '</div>'
+
+        + '</div></body></html>';
+
+      // فتح نافذة الطباعة
+      var printWin = window.open('', '_blank', 'width=900,height=700');
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(function() { printWin.print(); }, 500);
+    })
+    .catch(function(err) {
+      showToast('تعذّر تحميل البيانات للطباعة', 'error');
+    });
+}
+
+
+// ══════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════
+function exportData(fmt) {
+  var params = buildParams();
+  var qs = new URLSearchParams(params).toString();
+  var format = fmt.toLowerCase(); 
+  var url = '/api/export/' + format + '/?' + qs;
+
+  // إظهار التنبيه فور الضغط
+  showToast('جاري تحضير تقرير ' + fmt + '... سيبدأ التحميل لحظات', 'info');
+
+  // تنفيذ التحميل
+  var a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  
+  setTimeout(function() { 
+      document.body.removeChild(a);
+      // تنبيه نجاح اختياري
+      showToast('تم إرسال الطلب للسيرفر بنجاح', 'success');
+  }, 1000);
+}
+
+// showDetail — kept for backward compatibility
+function showDetail(r) {
+  if (r && r.id) openDetailModal(r.id);
+}
+
+
+
+
+
+</script>
+
+<!-- NEWS TICKER -->
+<div id="ticker-bar">
+  <div id="ticker-label"><i class="fa fa-circle-info"></i> &nbsp;إشعار</div>
+  <div id="ticker-track">
+    <div id="ticker-text">
+      <i class="fa fa-star"></i>
+      منظومة توثيق أراضي طرح النهر &nbsp;—&nbsp; وزارة الموارد المائية والري &nbsp;—&nbsp; جمهورية مصر العربية
+      <i class="fa fa-award"></i>
+      تصميم وتنفيذ م/ محمد الرافعي المكباتي
+      <i class="fa fa-star"></i>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </div>
+  </div>
+</div>
+
+<!-- REJECTED LIST MODAL -->
+<div id="modal-rejected" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:750px;max-width:96vw;max-height:90vh;background:#fff;border-radius:12px;
+  box-shadow:0 8px 40px rgba(0,0,0,.3);z-index:3100;overflow:hidden;flex-direction:column;
+  display:none;">
+  <div style="background:linear-gradient(135deg,#7f8c8d,#95a5a6);color:#fff;padding:14px 18px;
+    display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-weight:700;font-size:.95rem;"><i class="fa fa-ban"></i> التعديات المرفوضة</span>
+    <span onclick="document.getElementById('modal-rejected').style.display='none';document.getElementById('modal-overlay').style.display='none';"
+      style="cursor:pointer;font-size:1.1rem;opacity:.8;">✕</span>
+  </div>
+  <div style="padding:8px 16px;background:#f8f9fa;border-bottom:1px solid #eee;font-size:.78rem;color:#666;">
+    <i class="fa fa-info-circle"></i> يمكن إعادة أي سجل مرفوض إلى قائمة الانتظار للمراجعة مرة أخرى
+  </div>
+  <div id="rejected-list" style="flex:1;overflow-y:auto;padding:12px;"></div>
+</div>
+
+
+<!-- AI ASSISTANT MODAL -->
+<div id="modal-ai" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:580px;max-width:96vw;height:520px;background:#fff;border-radius:14px;
+  box-shadow:0 8px 40px rgba(0,0,0,.3);z-index:3100;overflow:hidden;
+  flex-direction:column;display:none;">
+
+  <div style="background:linear-gradient(135deg,#8e44ad,#9b59b6);color:#fff;
+    padding:13px 18px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <span style="font-weight:700;font-size:.95rem;">
+      <i class="fa fa-robot"></i> المساعد الذكي — منظومة توثيق أراضي طرح النهر
+    </span>
+    <span onclick="closeAI()" style="cursor:pointer;opacity:.8;font-size:1.1rem;">✕</span>
+  </div>
+
+  <!-- AI Status Bar -->
+  <div id="ai-status-bar" style="padding:6px 16px;font-size:.75rem;background:#f8f4ff;
+    border-bottom:1px solid #e8d5f5;display:flex;align-items:center;gap:8px;flex-shrink:0;">
+    <span id="ai-status-dot" style="width:8px;height:8px;border-radius:50%;background:#95a5a6;flex-shrink:0;"></span>
+    <span id="ai-status-text">جاري التحقق من حالة الذكاء الاصطناعي…</span>
+  </div>
+
+  <!-- Chat Messages -->
+  <div id="ai-chat-messages" style="flex:1;overflow-y:auto;padding:14px 16px;
+    display:flex;flex-direction:column;gap:10px;background:#fafafa;">
+    <div style="text-align:center;color:#888;font-size:.82rem;padding:20px 0;">
+      <i class="fa fa-robot" style="font-size:2rem;color:#9b59b6;margin-bottom:8px;display:block;"></i>
+      مرحباً! أنا مساعدك الذكي.<br>اسألني عن أي شيء في بيانات المنظومة.
+      <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;">
+        <button onclick="askAI('ما هي أكثر المحافظات تعدياً؟')" class="ai-suggest-btn">📊 أكثر المحافظات تعدياً</button>
+        <button onclick="askAI('كم إجمالي المساحة المتعدى عليها؟')" class="ai-suggest-btn">📐 إجمالي المساحة</button>
+        <button onclick="askAI('ما أكثر أنواع الاستغلال شيوعاً؟')" class="ai-suggest-btn">🏗 أنواع الاستغلال</button>
+        <button onclick="askAI('أعطني ملخصاً شاملاً للبيانات')" class="ai-suggest-btn">📋 ملخص شامل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Features Tabs -->
+  <div style="display:flex;border-top:1px solid #eee;border-bottom:1px solid #eee;flex-shrink:0;">
+    <button onclick="switchAITab('chat')" id="ai-tab-chat"
+      style="flex:1;padding:7px;border:none;background:#9b59b6;color:#fff;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;">
+      <i class="fa fa-comments"></i> محادثة
+    </button>
+    <button onclick="switchAITab('report')" id="ai-tab-report"
+      style="flex:1;padding:7px;border:none;background:#f8f4ff;color:#8e44ad;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;border-right:1px solid #eee;">
+      <i class="fa fa-file-alt"></i> تقرير ذكي
+    </button>
+    <button onclick="switchAITab('classify')" id="ai-tab-classify"
+      style="flex:1;padding:7px;border:none;background:#f8f4ff;color:#8e44ad;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;">
+      <i class="fa fa-tags"></i> تصنيف
+    </button>
+  </div>
+
+  <!-- Chat Input -->
+  <div id="ai-panel-chat" style="padding:10px 14px;display:flex;gap:8px;flex-shrink:0;background:#fff;">
+    <input type="text" id="ai-input" placeholder="اسأل عن البيانات… مثال: ما أعلى قرية من حيث التعديات؟"
+      style="flex:1;padding:9px 12px;border:1.5px solid #d0d7e3;border-radius:8px;
+      font-family:inherit;font-size:.83rem;outline:none;"
+      onkeydown="if(event.key==='Enter') sendAIMessage()"
+      onfocus="this.style.borderColor='#9b59b6'" onblur="this.style.borderColor='#d0d7e3'">
+    <button onclick="sendAIMessage()"
+      style="padding:9px 16px;background:#8e44ad;color:#fff;border:none;border-radius:8px;
+      cursor:pointer;font-family:inherit;font-size:.83rem;font-weight:600;">
+      <i class="fa fa-paper-plane"></i>
+    </button>
+  </div>
+
+  <!-- Report Panel -->
+  <div id="ai-panel-report" style="display:none;padding:12px 14px;flex:1;overflow-y:auto;">
+    <div style="font-size:.8rem;color:#666;margin-bottom:10px;">
+      يولّد تقريراً نصياً احترافياً بناءً على الفلاتر الحالية
+    </div>
+    <button onclick="generateAIReport()"
+      style="width:100%;padding:10px;background:#8e44ad;color:#fff;border:none;
+      border-radius:8px;cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:700;margin-bottom:10px;">
+      <i class="fa fa-magic"></i> توليد التقرير
+    </button>
+    <div id="ai-report-output" style="font-size:.8rem;line-height:1.8;white-space:pre-wrap;color:#333;"></div>
+  </div>
+
+  <!-- Classify Panel -->
+  <div id="ai-panel-classify" style="display:none;padding:12px 14px;">
+    <div style="font-size:.8rem;color:#666;margin-bottom:8px;">أدخل وصف الاستغلال للتصنيف التلقائي</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <input type="text" id="classify-input" placeholder="مثال: مبني 2 دور، فضاء، مزروعة…"
+        style="flex:1;padding:8px 10px;border:1.5px solid #d0d7e3;border-radius:6px;font-family:inherit;font-size:.82rem;outline:none;">
+      <button onclick="classifyDescription()"
+        style="padding:8px 14px;background:#8e44ad;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:600;">
+        <i class="fa fa-tags"></i> صنّف
+      </button>
+    </div>
+    <div id="classify-result" style="font-size:.82rem;"></div>
+  </div>
+</div>
+
+<style>
+  #modal-ai.open { display: flex !important; }
+  .ai-suggest-btn {
+    padding: 5px 10px; background: #f0e6ff; color: #8e44ad;
+    border: 1px solid #d0b3ff; border-radius: 14px; cursor: pointer;
+    font-family: inherit; font-size: .73rem; font-weight: 600;
+    transition: all .2s;
+  }
+  .ai-suggest-btn:hover { background: #8e44ad; color: #fff; }
+  .ai-msg-user {
+    align-self: flex-start; background: #f0e6ff; color: #4a235a;
+    padding: 9px 13px; border-radius: 12px 12px 0 12px;
+    font-size: .82rem; max-width: 80%;
+  }
+  .ai-msg-bot {
+    align-self: flex-end; background: #fff; color: #333;
+    padding: 9px 13px; border-radius: 12px 12px 12px 0;
+    font-size: .82rem; max-width: 85%; border: 1px solid #e8d5f5;
+    white-space: pre-wrap; line-height: 1.6;
+  }
+  .ai-msg-loading {
+    align-self: flex-end; background: #fff; color: #888;
+    padding: 9px 13px; border-radius: 12px; font-size: .8rem;
+    border: 1px solid #e8d5f5;
+  }
+</style>
+
+<script>
+
+// ══════════════════════════════════════════
+// AI ASSISTANT
+// ══════════════════════════════════════════
+var aiHistory = [];
+var aiCurrentTab = 'chat';
+
+function openAIAssistant() {
+  openModal('modal-ai');
+  checkAIStatus();
+}
+
+function closeAI() {
+  var overlay = document.getElementById('modal-overlay');
+  var modal   = document.getElementById('modal-ai');
+  if (overlay) overlay.style.display = 'none';
+  if (modal)   modal.style.display   = 'none';
+}
+
+function checkAIStatus() {
+  var dot  = document.getElementById('ai-status-dot');
+  var text = document.getElementById('ai-status-text');
+  fetch('/api/ai/status/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ollama_running) {
+        var ready = Object.values(d.ready).filter(Boolean).length;
+        dot.style.background  = ready >= 2 ? '#27ae60' : '#f39c12';
+        text.textContent = ready >= 2
+          ? 'الذكاء الاصطناعي جاهز — ' + Object.keys(d.ready).filter(function(k){return d.ready[k];}).join('، ')
+          : 'Ollama يعمل لكن بعض النماذج غير محملة — شغّل: ollama pull llama3.2';
+      } else {
+        dot.style.background = '#e74c3c';
+        text.innerHTML = '⚠ Ollama غير مشغّل — <a href="https://ollama.com/download" target="_blank" style="color:#8e44ad;">حمّله هنا</a> ثم شغّل: <code>ollama serve</code>';
+      }
+    })
+    .catch(function() {
+      dot.style.background = '#e74c3c';
+      text.textContent = '⚠ تعذّر الاتصال بخدمة الذكاء الاصطناعي';
+    });
+}
+
+function switchAITab(tab) {
+  aiCurrentTab = tab;
+  ['chat','report','classify'].forEach(function(t) {
+    var btn   = document.getElementById('ai-tab-' + t);
+    var panel = document.getElementById('ai-panel-' + t);
+    if (btn) {
+      btn.style.background = t === tab ? '#9b59b6' : '#f8f4ff';
+      btn.style.color      = t === tab ? '#fff'    : '#8e44ad';
+    }
+    if (panel) panel.style.display = t === tab ? 'flex' : 'none';
+    if (t === 'chat' && t === tab) panel.style.flexDirection = 'column';
+  });
+  // fix chat messages display
+  if (tab === 'chat') {
+    var msgs = document.getElementById('ai-chat-messages');
+    if (msgs) msgs.style.display = 'flex';
+    var input = document.getElementById('ai-panel-chat');
+    if (input) input.style.display = 'flex';
+  }
+}
+
+function sendAIMessage() {
+  var input = document.getElementById('ai-input');
+  var q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  askAI(q);
+}
+
+function askAI(question) {
+  var msgs = document.getElementById('ai-chat-messages');
+  if (aiCurrentTab !== 'chat') switchAITab('chat');
+
+  // أضف رسالة المستخدم
+  var userDiv = document.createElement('div');
+  userDiv.className = 'ai-msg-user';
+  userDiv.textContent = question;
+  msgs.appendChild(userDiv);
+
+  // أضف مؤشر التحميل
+  var loadDiv = document.createElement('div');
+  loadDiv.className = 'ai-msg-loading';
+  loadDiv.innerHTML = '<i class="fa fa-spinner fa-spin"></i> جاري التفكير…';
+  msgs.appendChild(loadDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  fetch('/api/ai/chat/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({question: question, history: aiHistory})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    msgs.removeChild(loadDiv);
+    var botDiv = document.createElement('div');
+    botDiv.className = 'ai-msg-bot';
+    botDiv.textContent = data.answer || data.error || 'لا توجد إجابة';
+    msgs.appendChild(botDiv);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // حفظ في التاريخ
+    aiHistory.push({role:'user',    content: question});
+    aiHistory.push({role:'assistant', content: data.answer || ''});
+    if (aiHistory.length > 12) aiHistory = aiHistory.slice(-12);
+  })
+  .catch(function() {
+    msgs.removeChild(loadDiv);
+    var errDiv = document.createElement('div');
+    errDiv.className = 'ai-msg-bot';
+    errDiv.style.color = '#e74c3c';
+    errDiv.textContent = 'تعذّر الاتصال — تأكد من تشغيل Ollama';
+    msgs.appendChild(errDiv);
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+}
+
+function generateAIReport() {
+  var output = document.getElementById('ai-report-output');
+  output.innerHTML = '<i class="fa fa-spinner fa-spin"></i> جاري توليد التقرير، قد يستغرق دقيقة…';
+  var params = buildParams ? new URLSearchParams(buildParams()).toString() : '';
+  fetch('/api/ai/report/?' + params)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      output.textContent = d.report || d.error || 'تعذّر توليد التقرير';
+    })
+    .catch(function() {
+      output.textContent = 'تعذّر الاتصال — تأكد من تشغيل Ollama';
+    });
+}
+
+function classifyDescription() {
+  var input  = document.getElementById('classify-input');
+  var result = document.getElementById('classify-result');
+  var text   = input.value.trim();
+  if (!text) return;
+
+  result.innerHTML = '<i class="fa fa-spinner fa-spin"></i> جاري التصنيف…';
+  fetch('/api/ai/classify/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCsrfToken()},
+    body: JSON.stringify({description: text})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var confColor = d.confidence === 'عالية' ? '#27ae60' : d.confidence === 'متوسطة' ? '#f39c12' : '#e74c3c';
+    result.innerHTML =
+      '<div style="background:#f0e6ff;border-radius:8px;padding:12px 14px;">' +
+      '<div style="font-weight:700;font-size:.9rem;color:#8e44ad;margin-bottom:6px;">' +
+      '<i class="fa fa-tag"></i> ' + (d.category || '—') + '</div>' +
+      '<div style="font-size:.78rem;color:#666;">الثقة: <span style="color:' + confColor + ';font-weight:700;">' + (d.confidence||'—') + '</span></div>' +
+      '<div style="font-size:.78rem;color:#888;margin-top:4px;">' + (d.explanation||'') + '</div>' +
+      '<div style="font-size:.72rem;color:#aaa;margin-top:4px;">الطريقة: ' + (d.method||'—') + '</div>' +
+      '</div>';
+  })
+  .catch(function() {
+    result.textContent = 'تعذّر التصنيف';
+  });
+}
+
+// إضافة زر كشف التكرار في نافذة التفاصيل
+function checkDuplicates(id) {
+  showToast('جاري البحث عن سجلات مشابهة…', 'info');
+  fetch('/api/ai/duplicates/' + id + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.duplicates || !d.duplicates.length) {
+        showToast('لا توجد سجلات مشابهة ✓', 'success');
+        return;
+      }
+      var msg = 'تحذير: وُجد ' + d.count + ' سجل مشابه:\n';
+      d.duplicates.slice(0,3).forEach(function(dup) {
+        msg += '• ' + dup.code + ' — ' + dup.village + ' (' + dup.similarity + '% تشابه — خطر ' + dup.risk + ')\n';
+      });
+      alert(msg);
+    });
+}
+
+</script>
+</body>
+</html>
