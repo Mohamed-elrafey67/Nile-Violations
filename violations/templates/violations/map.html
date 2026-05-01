@@ -735,11 +735,6 @@
   }
 </style>
 
-
-
-
-
-
 <script>
 
 // ══════════════════════════════════════════
@@ -881,6 +876,28 @@ var polyGroup  = L.layerGroup().addTo(map);
 var choroGroup = L.layerGroup();
 var ptCluster  = L.markerClusterGroup({maxClusterRadius: 50});
 map.addLayer(ptCluster);
+// تحميل بيانات الأراضي من Django
+fetch('/gis/geojson/')
+.then(res => res.json())
+.then(data => {
+    const layer = L.geoJSON(data, {
+        onEachFeature: function (feature, layer) {
+            // Popup عند الضغط
+            layer.bindPopup(
+                "الاسم: " + (feature.properties.name || "غير متوفر") + "<br>" +
+                "المساحة: " + (feature.properties.area || "0")
+            );
+        },
+        style: {
+            color: "#3388ff",
+            weight: 2
+        }
+    });
+
+    layer.addTo(polyGroup); // 👈 مهم جدًا عشان يتضاف مع طبقة polygons
+
+    map.fitBounds(layer.getBounds()); // 👈 يروح لمكان الأراضي
+});
 
 // ══════════════════════════════════════════
 // STATE
