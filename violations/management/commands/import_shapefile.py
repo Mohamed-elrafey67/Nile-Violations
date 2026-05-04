@@ -146,16 +146,13 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("═" * 60))
                 self.stdout.write(self.style.WARNING("وضع التجربة - لن يتم الحفظ في قاعدة البيانات"))
                 self.stdout.write(self.style.WARNING("═" * 60))
-                self.stdout.write(f"
-إجمالي السجلات المُحللة: {len(parcels_data)}")
-                self.stdout.write("
-أول 5 سجلات:")
+                self.stdout.write(f"إجمالي السجلات المُحللة: {len(parcels_data)}")
+                self.stdout.write("أول 5 سجلات:")
                 for p in parcels_data[:5]:
                     self.stdout.write(f"  • {p['symbol']} | {p['village']} | {p['beneficiary']} | {p['usage_description']}")
 
                 # إحصائيات سريعة
-                self.stdout.write("
-📊 إحصائيات:")
+                self.stdout.write("📊 إحصائيات:")
                 gov_count = len(set(p['governorate'] for p in parcels_data))
                 center_count = len(set(p['center'] for p in parcels_data if p['center']))
                 village_count = len(set(p['village'] for p in parcels_data if p['village']))
