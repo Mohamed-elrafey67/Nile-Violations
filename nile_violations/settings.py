@@ -15,7 +15,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'violations',
     'gis_module',
-]
+    'nile_lands',
+    ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
