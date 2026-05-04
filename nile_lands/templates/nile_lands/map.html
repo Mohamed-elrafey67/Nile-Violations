@@ -1026,7 +1026,7 @@ function onGovChange() {
     return;
   }
 
-  fetch('/api/filter-options/?gov=' + encodeURIComponent(gov))
+  fetch('/nile_lands/api/filter-options/?gov=' + encodeURIComponent(gov))
     .then(r => r.json())
     .then(function(d) {
 
@@ -1042,28 +1042,38 @@ function onGovChange() {
     });
 }
 function onDistrictChange() {
-  var gov      = document.getElementById('f-gov').value;
+  var gov = document.getElementById('f-gov').value;
   var district = document.getElementById('f-district').value;
 
-  // Reset village dropdown
-  document.getElementById('f-village').innerHTML = '<option value="">— جميع القرى —</option>';
+  document.getElementById('f-village').innerHTML =
+    '<option value="">— جميع القرى —</option>';
 
-  // Build query params
+  document.getElementById('f-desc').innerHTML =
+    '<option value="">— الكل —</option>';
+
   var params = '';
-  if (gov)      params += '?gov=' + encodeURIComponent(gov);
-  if (district) params += (params ? '&' : '?') + 'district=' + encodeURIComponent(district);
+  if (gov) {
+    params += '?gov=' + encodeURIComponent(gov);
+  }
+  if (district) {
+    params += (params ? '&' : '?') + 'district=' + encodeURIComponent(district);
+  }
 
   if (gov || district) {
-    fetch('/api/filter-options/' + params)
+    fetch('/nile_lands/api/filter-options/' + params)
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        fillSelect('f-village', d.villages);
-        fillSelect('f-desc',    d.descriptions);
+        fillSelect('f-village', d.villages || []);
+        scheduleFilter();
+      })
+      .catch(function(err) {
+        console.error(err);
+        scheduleFilter();
       });
+  } else {
+    scheduleFilter();
   }
-  scheduleFilter();
 }
-
 function fillSelect(id, items) {
   var el = document.getElementById(id);
   (items || []).forEach(function(v) {
@@ -1103,7 +1113,7 @@ function loadData(params) {
 
   var qs = new URLSearchParams(params).toString();
 
-  fetch('/nile_lands/api/parcels/?' + qs)
+  fetch('/nile_lands/api/parcels/geojson/?' + qs)
     .then(r => r.json())
     .then(function(data) {
 

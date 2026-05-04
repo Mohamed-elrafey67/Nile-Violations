@@ -118,14 +118,79 @@ def parcel_detail_api(request, pk):
     })
 
 @login_required(login_url='login')
+def parcels_geojson(request):
+    qs = LandParcel.objects.all()
+
+    gov = request.GET.get('gov', '').strip()
+    district = request.GET.get('district', '').strip()
+    village = request.GET.get('village', '').strip()
+    search = request.GET.get('search', '').strip()
+    min_area = request.GET.get('min_area', '').strip()
+
+    if gov:
+        qs = qs.filter(governorate=gov)
+
+    if district:
+        qs = qs.filter(district=district)
+
+    if village:
+        qs = qs.filter(village=village)
+
+    if search:
+        qs = qs.filter(
+            Q(exploiter_name__icontains=search) |
+            Q(symbol__icontains=search) |
+            Q(parcel_id__icontains=search) |
+            Q(basin_name__icontains=search)
+        )
+
+    if min_area:
+        try:
+            qs = qs.filter(area__gte=float(min_area))
+        except Exception:
+            pass
+
+    features = []
+
+    for p in qs[:3000]:
+        if not p.geometry:
+            continue
+
+        features.append({
+            "type": "Feature",
+            "geometry": p.geometry,
+            "properties": {
+                "id": p.id,
+                "symbol": p.symbol,
+                "governorate": p.governorate,
+                "district": p.district,
+                "village": p.village,
+                "exploiter_name": p.exploiter_name,
+                "basin_name": p.basin_name,
+                "area": float(p.area or 0),
+                "remarks": p.remarks,
+            }
+        })
+
+    total_area = sum(float(p.area or 0) for p in qs[:3000])
+
+    return JsonResponse({
+        "type": "FeatureCollection",
+        "features": features,
+        "count": qs.count(),
+        "total_area": round(total_area, 2),
+    })
+
+
+@login_required(login_url='login')
 def parcel_filter_options(request):
     gov = request.GET.get('gov', '').strip()
     district = request.GET.get('district', '').strip()
 
     qs = LandParcel.objects.all()
 
-    govs = sorted(
-        LandParcel.objects.values_list('governorate', flat=True).distinct()
+    governorates = sorted(
+        qs.values_list('governorate', flat=True).distinct()
     )
 
     districts = []
@@ -146,7 +211,7 @@ def parcel_filter_options(request):
         )
 
     return JsonResponse({
-        "governorates": list(govs),
+        "governorates": list(governorates),
         "districts": list(districts),
         "villages": list(villages),
     })
